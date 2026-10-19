@@ -3,9 +3,9 @@ from collections import defaultdict
 from engine import ev_of, summarize, verdict, goals_list
 
 # Published rating formula (every term is listed so a user can audit a rating)
-W = {"goal": 1.0, "shot_xg": 0.8, "progressive_pass": 0.04, "pass_ok": 0.004, "pass_lost": -0.03,
-     "dribble": 0.05, "tackle": 0.15, "interception": 0.12, "duel": 0.08, "foul": -0.10,
-     "yellow_card": -0.30, "save": 0.35, "block": 0.12}
+W = {"goal": 0.9, "shot_xg": 0.6, "progressive_pass": 0.02, "pass_ok": 0.002, "pass_lost": -0.04,
+     "dribble": 0.03, "tackle": 0.10, "interception": 0.08, "duel": 0.05, "foul": -0.10,
+     "yellow_card": -0.30, "save": 0.25, "block": 0.08}
 
 def ratings(m):
     ev = m["events"]; R = defaultdict(lambda: {"base": 6.0, "parts": defaultdict(lambda: [0.0, []]), "touches": 0})

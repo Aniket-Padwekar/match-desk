@@ -29,6 +29,7 @@ def verify(claim, m):
     if k == "score_after":
         e = next((x for x in ev if x["id"] == p["event_id"]), None)
         ok = bool(e) and e["type"] == "goal" and (e["score_home"], e["score_away"]) == (p["home"], p["away"])
+        if ok and "role" in p: ok = goal_context(m, e)[:2] == (p["role"], p["n"])
         return ok, f'event #{p["event_id"]}: score {e["score_home"]}-{e["score_away"]}' if e else "no such event"
     if k == "why":
         w = why_result(m); ok = bool(w) and p["reason"] in [r["text"] for r in w["reasons"]]
@@ -44,6 +45,22 @@ def verify(claim, m):
         h, a = team_stat(ev, "home", "goals"), team_stat(ev, "away", "goals")
         return (h - a) == p["diff"], f"goal difference {h - a}"
     return verify_basic(claim, m)
+
+def goal_context(m, e):
+    """Role of a goal in the story, derived only from the score before and after (so the checker can re-derive it)."""
+    goals = [x for x in m["events"] if x["type"] == "goal"]
+    prev = [x for x in goals if x["id"] < e["id"]]
+    h0, a0 = (prev[-1]["score_home"], prev[-1]["score_away"]) if prev else (0, 0)
+    own0, opp0 = (h0, a0) if e["side"] == "home" else (a0, h0)
+    d0 = own0 - opp0; d1 = d0 + 1
+    if not prev: role = "opened the scoring"
+    elif d1 == 0: role = "equalised"
+    elif d0 == 0: role = "took the lead"
+    elif d0 < 0: role = "pulled one back"
+    else: role = "extended the lead"
+    n = 1 + sum(1 for x in prev if x["player_id"] == e["player_id"])
+    nth = {1: "", 2: ", his second goal of the match", 3: ", his third goal of the match (a hat-trick)"}.get(n, f", his goal number {n} of the match")
+    return role, n, nth
 
 def analyst(m):
     """StatsAnalyst: deterministic. Builds the case file of checkable facts."""
@@ -61,8 +78,9 @@ def analyst(m):
     for k in key_moments(m):
         if k["kind"] == "goal":
             hh, aa = map(int, k["score"].split("-"))
-            add("score_after", f'After {k["player"]}\'s goal for {k["team"]} in minute {k["minute"]+1} it was {hh}-{aa} ({meta["home"]} {hh}, {meta["away"]} {aa})',
-                event_id=k["event_ids"][0], home=hh, away=aa)
+            ge = next(x for x in m["events"] if x["id"] == k["event_ids"][0]); role, n, nth = goal_context(m, ge)
+            add("score_after", f'{k["player"]}\'s goal for {k["team"]} in minute {k["minute"]+1} {role}; it was {hh}-{aa} ({meta["home"]} {hh}, {meta["away"]} {aa}){nth}',
+                event_id=k["event_ids"][0], home=hh, away=aa, role=role, n=n)
     w = why_result(m)
     for r in (w or {}).get("reasons", []):
         add("why", r["text"], reason=r["text"])
@@ -77,7 +95,7 @@ def analyst(m):
     facts = [{"id": c["id"], "text": c["text"], "claim": c} for c in claims]
     return {"facts": facts, "verdict": v, "why": why_result(m), "moments": key_moments(m)}
 
-def checker(m, sentence, facts_by_id):
+def checker(m, sentence, facts_by_id, audience=None):
     """FactChecker (rules): citations, numbers (digits + number words), names, comparison words."""
     meta = m["meta"]; ids = sentence.get("fact_ids") or []
     if not ids or any(i not in facts_by_id for i in ids): return False, "no valid fact cited", []
@@ -97,6 +115,8 @@ def checker(m, sentence, facts_by_id):
     allowed = set().union(*[numbers_in(facts_by_id[i]["text"]) for i in ids])
     stray = [n for n in numbers_in(sentence["text"]) if n not in allowed]
     if stray: return False, f"number(s) {stray} not in cited facts", []
+    if audience == "fan" and re.search(r"expected goals|\bxg\b", sentence["text"], re.I):
+        return False, "jargon for a fan reader: say 'chance quality' instead of 'expected goals'", []
     # comparison words about possession must agree with the cited possession value
     t = sentence["text"].lower()
     pos_facts = [facts_by_id[i]["claim"] for i in ids if facts_by_id[i]["claim"]["kind"] == "possession"]
@@ -156,14 +176,14 @@ class AzureLLM:
         from ask import TOOL_SPECS
         me = m["meta"]
         sys = ("You turn a football question about ONE match into tool calls. " + TOOL_SPECS + f" The match is {me['home']} (home) vs {me['away']} (away). "
-               'Return JSON: {"calls":[{"tool":"...","args":{...}}]} or {"unanswerable":"<short phrase, max 15 words, what is missing; never ask a question back>"}. At most 3 calls. Use the tools even if the question says "home team" or "away team".')
+               'Judgements about decisions or fairness (referee, manager, tactics), predictions, medical prognosis or how long someone will be absent are unanswerable even when a related lookup exists. For unanswerable, name the missing information in under 12 words, for example "the referee\'s judgement is not recorded". Return JSON: {"calls":[{"tool":"...","args":{...}}]} or {"unanswerable":"<what is missing; never ask a question back>"}. At most 3 calls. Use the tools even if the question says "home team" or "away team".')
         r = self._chat(sys, question)
         return r["calls"] if r.get("calls") else {"unanswerable": r.get("unanswerable") or "no tool fits"}
     def answer_write(self, question, facts, audience, lang):
         sys = ("You answer a football question using ONLY the facts given. Cite the fact ids used in every sentence. Never add a number, name or comparison that the facts do not state; "
-               "no causes or opinions unless a fact states them. Answer only what was asked; do NOT add sentences about what the facts leave out. "
+               "no causes or opinions unless a fact states them. If the facts do not actually answer the question asked (for example the question is about the future, an opinion, or something the facts only relate to), set answers_question to false and return no sentences. Answer only what was asked; do NOT add sentences about what the facts leave out. "
                f"Style: {STYLE[audience]} Language: {lang}. Answer in 1-3 short sentences. "
-               'Return JSON: {"sentences":[{"text":"...","fact_ids":[1]}]}')
+               'Return JSON: {"answers_question": true, "sentences":[{"text":"...","fact_ids":[1]}]}')
         return self._chat(sys, json.dumps({"question": question, "facts": [{"id": f["id"], "text": f["text"]} for f in facts]}, ensure_ascii=False))
     def judge(self, items):
         sys = ("You are a strict football fact judge. For each item, decide whether the sentence is FULLY supported by its cited facts: "
@@ -182,7 +202,7 @@ class AzureLLM:
             by[idx] = bool(v.get("supported", v.get("ok", False))); self.last_problems[idx] = v.get("problem", "")
         return [by.get(i, False) for i in range(len(items))]
     def fix(self, sentence, facts_by_id, reason):
-        sys = ("Rewrite ONE sentence so it is fully supported by the allowed facts using only plain description, or return null if it cannot be. "
+        sys = ("Rewrite ONE sentence so it is fully supported by the allowed facts using only plain description, or return null if it cannot be. Fix exactly what the reason says: use full team names, and say 'chance quality' instead of 'expected goals' when the reason mentions jargon. "
                'Return JSON: {"sentence": {"text":"...","fact_ids":[...]} or null}')
         allowed = [{"id": i, "text": facts_by_id[i]["text"]} for i in sentence["fact_ids"] if i in facts_by_id]
         return self._chat(sys, json.dumps({"bad": sentence["text"], "reason": reason, "allowed_facts": allowed}, ensure_ascii=False))["sentence"]
@@ -201,7 +221,7 @@ def pipeline(m, llm, audience="fan", lang="English", max_fix=1):
     w = llm.write([{"id": f["id"], "text": f["text"]} for f in facts], audience, lang)
     draft, headline = w["sentences"], w.get("headline", "")
     trace.append({"agent": "Storyteller", "event": f"drafted {len(draft)} sentences"})
-    rules = [checker(m, s, fb) for s in draft]
+    rules = [checker(m, s, fb, audience) for s in draft]
     jitems = [{"i": i, "sentence": s["text"], "cited_facts": [fb[x]["text"] for x in s["fact_ids"] if x in fb]} for i, s in enumerate(draft)]
     judged = llm.judge(jitems) if jitems else []
     final, st = [], dict(drafted=len(draft), blocked_by_rules=0, blocked_by_judge=0, fixed=0, dropped=0)
@@ -215,7 +235,7 @@ def pipeline(m, llm, audience="fan", lang="English", max_fix=1):
             for _ in range(max_fix):
                 s2 = llm.fix(s, fb, reason)
                 if s2:
-                    ok2, r2, rec2 = checker(m, s2, fb)
+                    ok2, r2, rec2 = checker(m, s2, fb, audience)
                     j2 = llm.judge([{"i": 0, "sentence": s2["text"], "cited_facts": [fb[x]["text"] for x in s2["fact_ids"] if x in fb]}])[0] if ok2 else False
                     if ok2 and j2: s2["_mutated"] = False; s, ok, rec = s2, True, rec2; st["fixed"] += 1; trace.append({"agent": "Editor", "event": "rewrote sentence; re-check passed"}); break
             if not ok: st["dropped"] += 1; trace.append({"agent": "Editor", "event": "dropped unsupported sentence"}); continue

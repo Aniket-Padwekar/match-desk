@@ -41,18 +41,28 @@ for n, seed in enumerate(SEEDS, 1):
         except Exception as e: print("  ask FAILED", q, str(e)[:150]); continue
         ask[mid].append({k: r[k] for k in ("question", "status", "answer", "sentences", "trace")})
     print("  questions done:", len(ask[mid]))
-print("\n=== SCORECARD (planted errors) ===")
-sc = real_scorecard(llm, n_matches=6, verbose=False)
-names = {"wrong_number": "wrong number", "wrong_team": "swapped team", "invented_cause": "invented cause", "flipped_comparison": "flipped comparison", "wrong_citation": "wrong citation"}
-score = {"source": "measured", "model": deployment, "matches": 6, "planted_errors": sc["planted_errors"], "caught": sc["caught"],
-         "true_sentences": sc["true_sentences"], "wrongly_blocked": sc["wrongly_blocked"],
-         "by_kind": {names[k]: v for k, v in sc["by_kind(blocked,total)"].items() if k in names}, "missed_examples": sc["missed_examples"],
-         "recap_first_pass": tot}
-print(json.dumps(score, indent=1, ensure_ascii=False))
-files_ = {"recaps.json": {"source": "azure", "model": deployment, "recaps": recaps}, "ask.json": {"source": "azure", "model": deployment, "ask": ask}, "scorecard.json": score}
-with zipfile.ZipFile("site_data.zip", "w") as z:
-    for name, obj in files_.items(): z.writestr(name, json.dumps(obj, ensure_ascii=False, separators=(",", ":")))
-print("\nDONE. Downloading site_data.zip")
+def save_zip(extra=None):
+    files_ = {"recaps.json": {"source": "azure", "model": deployment, "recaps": recaps}, "ask.json": {"source": "azure", "model": deployment, "ask": ask}}
+    if extra: files_["scorecard.json"] = extra
+    with zipfile.ZipFile("site_data.zip", "w") as z:
+        for name, obj in files_.items(): z.writestr(name, json.dumps(obj, ensure_ascii=False, separators=(",", ":")))
+save_zip()
+print("\nRecaps and answers saved (site_data.zip). Now the planted-error test, which is optional.")
 try:
     from google.colab import files; files.download("site_data.zip")
 except Exception: pass
+print("\n=== SCORECARD (planted errors) ===")
+try:
+    sc = real_scorecard(llm, n_matches=6, verbose=False)
+    names = {"wrong_number": "wrong number", "wrong_team": "swapped team", "invented_cause": "invented cause", "flipped_comparison": "flipped comparison", "wrong_citation": "wrong citation"}
+    score = {"source": "measured", "model": deployment, "matches": 6, "planted_errors": sc["planted_errors"], "caught": sc["caught"],
+             "true_sentences": sc["true_sentences"], "wrongly_blocked": sc["wrongly_blocked"],
+             "by_kind": {names[k]: v for k, v in sc["by_kind(blocked,total)"].items() if k in names}, "missed_examples": sc["missed_examples"], "recap_first_pass": tot}
+    print(json.dumps(score, indent=1, ensure_ascii=False))
+    save_zip(score)
+    print("\nDONE. Downloading site_data.zip again, now with the scorecard")
+    try:
+        from google.colab import files; files.download("site_data.zip")
+    except Exception: pass
+except Exception as e:
+    print("Scorecard step failed (the recaps and answers are already saved):", str(e)[:300])

@@ -5,7 +5,7 @@ the answer is a plain 'the data cannot tell', written by code, not by the model.
 import json, re
 from collections import Counter
 from insight import ratings, explain_rating, why_result
-from engine import key_moments
+from engine import key_moments, team_stat
 
 STATS = {"shots": ["shot"], "goals": ["goal"], "passes": ["pass"], "tackles": ["tackle"], "interceptions": ["interception"], "fouls": ["foul"],
          "yellow cards": ["yellow_card"], "corners": ["corner"], "saves": ["save"], "dribbles": ["dribble"], "duels": ["duel"], "pressures": ["pressure"]}
@@ -55,7 +55,7 @@ def run_tool(m, tool, args):
         lo, hi = _n(args.get("from_min")), _n(args.get("to_min"))
         if side not in ("home", "away") or stat not in STATS: return None
         hits = [e for e in ev if e["side"] == side and e["type"] in STATS[stat] and _window(e, lo, hi)]
-        win = f' between minute {lo} and {hi}' if lo and hi else ""
+        win = f' between minute {lo} and {hi}' if lo and hi else (f' from minute {lo} onwards' if lo else (f' up to minute {hi}' if hi else ''))
         return {"text": f'{lab(side)} had {len(hits)} {stat}{win}.', "receipts": [e["id"] for e in hits][:15]}
     if tool == "player_stat":
         hit = _find(m, args.get("player", ""))
@@ -90,7 +90,11 @@ def run_tool(m, tool, args):
         r = explain_rating(m, hit[0][0]); return {"text": r["text"], "receipts": r["receipts"]}
     if tool == "why_result":
         w = why_result(m)
-        if not w: return None
+        if not w:   # result matched the chances: state the plain comparison, no cause claimed
+            xg = {sd: team_stat(ev, sd, "xg") for sd in ("home", "away")}; sh = {sd: team_stat(ev, sd, "shots") for sd in ("home", "away")}
+            hg, ag = me["final_score"]["home"], me["final_score"]["away"]
+            txt = f'{me["home"]} {hg}-{ag} {me["away"]}. Chance quality was {xg["home"]} for {me["home"]} and {xg["away"]} for {me["away"]} (expected goals), with {sh["home"]} and {sh["away"]} shots. No unusual gap between the chances and the result was found.'
+            return {"text": txt, "receipts": [e["id"] for e in ev if e["type"] == "goal"]}
         return {"text": w["headline"] + " " + " ".join(r["text"] for r in w["reasons"]), "receipts": [i for r in w["reasons"] for i in r["receipts"]][:15]}
     if tool == "injuries":
         inj = [e for e in ev if e["type"] == "injury_stoppage"]
@@ -153,7 +157,11 @@ def answer(m, question, llm, audience="fan", lang="English"):
     if not facts:
         trace.append({"agent": "Tools", "event": "no tool could answer"})
         return {"question": question, "status": "cannot_tell", "answer": CANNOT + "none of the available lookups can answer it from this event log.", "sentences": [], "trace": trace}
-    w = llm.answer_write(question, facts, audience, lang)["sentences"]
+    raw = llm.answer_write(question, facts, audience, lang)
+    if raw.get("answers_question") is False:
+        trace.append({"agent": "Storyteller", "event": "the lookups do not answer what was asked"})
+        return {"question": question, "status": "cannot_tell", "answer": CANNOT + "none of the available lookups covers what was asked.", "sentences": [], "trace": trace}
+    w = raw["sentences"]
     items = [{"i": i, "sentence": s["text"], "cited_facts": [fb[x]["text"] for x in s["fact_ids"] if x in fb]} for i, s in enumerate(w)]
     judged = llm.judge(items) if items else []
     out = []
@@ -164,7 +172,14 @@ def answer(m, question, llm, audience="fan", lang="English"):
             rec = sorted({r for x in s["fact_ids"] for r in fb[x]["receipts"]})
             out.append({"text": s["text"], "fact_ids": s["fact_ids"], "receipts": rec})
         else:
-            trace.append({"agent": "Judge" if ok else "FactChecker", "event": "blocked a sentence: " + (why if not ok else "not fully supported")})
+            reason = why if not ok else "not fully supported"
+            trace.append({"agent": "Judge" if ok else "FactChecker", "event": "blocked a sentence: " + reason})
+            s2 = llm.fix(s, fb, reason)
+            if s2:
+                ok2, _, _ = checker(m, s2, fb)
+                if ok2 and llm.judge([{"i": 0, "sentence": s2["text"], "cited_facts": [fb[x]["text"] for x in s2["fact_ids"] if x in fb]}])[0]:
+                    out.append({"text": s2["text"], "fact_ids": s2["fact_ids"], "receipts": sorted({r for x in s2["fact_ids"] for r in fb[x]["receipts"]})})
+                    trace.append({"agent": "Editor", "event": "rewrote the sentence; re-check passed"})
     if not out:   # nothing survived: fall back to the tool facts themselves, which are true by construction
         out = [{"text": f["text"], "fact_ids": [f["id"]], "receipts": f["receipts"]} for f in facts]
         trace.append({"agent": "Editor", "event": "used the verified tool output directly"})
