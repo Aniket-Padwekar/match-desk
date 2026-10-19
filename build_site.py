@@ -21,6 +21,7 @@ def fact_events(m, f):
     if k == "final_score": return [e["id"] for e in ev if e["type"] == "goal"]
     if k == "why": return [i for r in (why_result(m) or {}).get("reasons", []) if r["text"] == p["reason"] for i in r["receipts"]]
     if k == "spell": return [e["id"] for e in ev if e["type"] == "shot" and e["side"] == p["side"] and p["lo"] <= e["minute"] < p["hi"]]
+    if k == "injury": return [p["event_id"]]
     if k == "rating":
         return [e["id"] for e in ev if e.get("player_id") == p["pid"] and e["type"] in ("goal", "shot", "save", "tackle", "interception")][:12]
     return []
@@ -35,7 +36,8 @@ def timeline(m):
         else: t, at = f'{k["team"]} had {int(k["possession"])}% of the touches between minute {k["minute"]+1} and {k["to"]} and led the chances by {k["xg_diff"]}.', k["to"]
         out.append({"minute": at, "kind": k["kind"], "side": k["side"], "text": t, "events": k["event_ids"]})
     for e in m["events"]:
-        if e["type"] == "substitution": out.append({"minute": e["minute"] + 1, "kind": "sub", "side": e["side"], "text": f'Substitution for {e["team"]}: {e["player"]} replaces {e.get("replaces")}.', "events": [e["id"]]})
+        if e["type"] == "injury_stoppage": out.append({"minute": e["minute"] + 1, "kind": "injury", "side": e["side"], "text": f'Injury stoppage: {e["player"]} ({e["team"]}) is down. Play stopped for {e["duration_s"]} seconds. ' + ("He is substituted off." if e["outcome"] == "substituted" else "He carries on."), "events": [e["id"]]})
+        if e["type"] == "substitution": out.append({"minute": e["minute"] + 1, "kind": "sub", "side": e["side"], "text": f'Substitution for {e["team"]}: {e["player"]} replaces {e.get("replaces")} ({e.get("reason", "tactical")}).', "events": [e["id"]]})
     out.sort(key=lambda x: x["minute"]); return out
 
 def build():
@@ -62,7 +64,7 @@ def placeholders(matches):
         rec = {}
         for mm in matches:
             m = simulate(mm["seed"]); rec[mm["id"]] = {}
-            for aud, lang in (("fan", "English"), ("analyst", "English"), ("coach", "German")):
+            for aud, lang in (("fan", "English"), ("analyst", "English"), ("coach", "English")):
                 out = pipeline(m, MockLLM(0, 0), audience=aud, lang=lang)
                 for s in out["sentences"]: s.pop("_mutated", None); s["text"] = s["text"].replace("..", ".")
                 rec[mm["id"]][f"{aud}:{lang}"] = {"headline": out["headline"], "sentences": out["sentences"], "trace": out["trace"], "stats": out["stats"]}

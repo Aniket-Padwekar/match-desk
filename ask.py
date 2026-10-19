@@ -18,6 +18,8 @@ TOOL_SPECS = """Tools (call with JSON):
 - top_rated(n) : the n highest-rated players in the match, with why the best one scored so well
 - rating(player) : the published rating formula applied to one player, with the biggest contributors
 - why_result() : the reasons the result did or did not match the chances
+- injuries() : injury stoppages (who, minute, how long play stopped, whether he was substituted off)
+- substitutions() : every substitution with the reason recorded (injury or tactical)
 - lineup_info(team) : players and positions of a team
 If the question needs something the event log does not contain (formation, tactics, instructions, injuries, fitness, intentions, opinions, players' speed or distance, anything about other matches or real teams), answer {"unanswerable": "<what is missing>"}.""" % (list(STATS), list(STATS))
 
@@ -86,6 +88,15 @@ def run_tool(m, tool, args):
         w = why_result(m)
         if not w: return None
         return {"text": w["headline"] + " " + " ".join(r["text"] for r in w["reasons"]), "receipts": [i for r in w["reasons"] for i in r["receipts"]][:15]}
+    if tool == "injuries":
+        inj = [e for e in ev if e["type"] == "injury_stoppage"]
+        if not inj: return {"text": "No injury stoppage was recorded in this match.", "receipts": []}
+        return {"text": "Injury stoppages: " + "; ".join(f'{e["player"]} ({e["team"]}) in minute {e["minute"]+1}, play stopped for {e["duration_s"]} seconds, ' + ("substituted off" if e["outcome"] == "substituted" else "carried on") for e in inj) + ".",
+                "receipts": [e["id"] for e in inj]}
+    if tool == "substitutions":
+        sb = [e for e in ev if e["type"] == "substitution"]
+        if not sb: return {"text": "No substitutions were made.", "receipts": []}
+        return {"text": "Substitutions: " + "; ".join(f'{e["team"]} minute {e["minute"]+1}, {e["player"]} replaced {e.get("replaces")} ({e.get("reason", "tactical")})' for e in sb) + ".", "receipts": [e["id"] for e in sb]}
     if tool == "lineup_info":
         t = (args.get("team") or "").lower()
         sd = "home" if t in me["home"].lower() or me["home"].lower() in t else "away" if t in me["away"].lower() or me["away"].lower() in t else None
@@ -102,7 +113,9 @@ class MockPlanner:
         ql = q.lower(); me = m["meta"]
         if "rated" in ql or "rating" in ql or "best player" in ql: return [{"tool": "top_rated", "args": {"n": 3}}]
         if any(w in ql for w in ["why", "deserve", "unlucky", "lucky"]): return [{"tool": "why_result", "args": {}}]
-        if any(w in ql for w in ["injur", "tired", "fatigue", "tactic", "formation", "manager", "coach", "instruct", "speed", "km", "feel", "best player in the league", "last season", "transfer"]):
+        if "injur" in ql and "how long" not in ql: return [{"tool": "injuries", "args": {}}]
+        if "substitut" in ql and "right" not in ql: return [{"tool": "substitutions", "args": {}}]
+        if any(w in ql for w in ["how long", "tired", "fatigue", "tactic", "formation", "manager", "coach", "instruct", "speed", "km", "feel", "best player in the league", "last season", "transfer"]):
             return {"unanswerable": "this is not recorded in the event log"}
         if ("goal" in ql or "scor" in ql) and ("who" in ql or "when" in ql): return [{"tool": "score_timeline", "args": {}}]
         for st in STATS:
@@ -160,3 +173,10 @@ QUESTIONS = [  # (question, should_be_answerable)
     ("Was the manager right to make that substitution?", False), ("Was anyone injured or tired in the second half?", False),
     ("What formation did the away team play?", False), ("How fast did the fastest player run?", False),
     ("Is this team better than Bayern Munich?", False), ("Who will win the next match?", False)]
+
+QUESTIONS_SITE = [  # asked on every match on the website
+    ("Who scored and when?", True), ("Why did the result go the way it did?", True), ("Which player was rated highest and why?", True),
+    ("How many shots did the home team have in the second half?", True), ("Who had the most tackles?", True), ("How many fouls did the away team commit?", True),
+    ("Who made the most interceptions?", True),
+    ("Was anyone injured?", True),
+    ("What formation did the away team play?", False), ("How long will the injured player be out for?", False), ("Was the referee right to book that player?", False)]

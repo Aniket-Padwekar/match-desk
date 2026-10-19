@@ -24,7 +24,7 @@ llm = AzureLLM(endpoint, key, deployment)
 
 
 SEEDS = [1, 4, 5, 12, 18, 20, 23, 32]
-RECAPS = [("fan", "English"), ("analyst", "English"), ("coach", "German")]
+RECAPS = [("fan", "English"), ("analyst", "English"), ("coach", "English")]
 recaps, ask, tot = {}, {}, dict(drafted=0, blocked=0)
 for n, seed in enumerate(SEEDS, 1):
     m = simulate(seed); mid = m["meta"]["match_id"]; recaps[mid] = {}; ask[mid] = []

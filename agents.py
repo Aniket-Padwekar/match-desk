@@ -33,6 +33,10 @@ def verify(claim, m):
     if k == "why":
         w = why_result(m); ok = bool(w) and p["reason"] in [r["text"] for r in w["reasons"]]
         return ok, "recomputed from event log"
+    if k == "injury":
+        e = next((x for x in ev if x["id"] == p["event_id"]), None)
+        ok = bool(e) and e["type"] == "injury_stoppage" and e["player"] == p["player"] and e["outcome"] == p["outcome"]
+        return ok, f'event #{p["event_id"]}' if e else "no such event"
     if k == "tool":
         from ask import run_tool
         r = run_tool(m, p["tool"], p["args"]); return bool(r) and r["text"] == p["text"], "re-run on the event log"
@@ -62,6 +66,10 @@ def analyst(m):
     w = why_result(m)
     for r in (w or {}).get("reasons", []):
         add("why", r["text"], reason=r["text"])
+    for e in [x for x in m["events"] if x["type"] == "injury_stoppage"]:
+        tail = "was substituted because of the injury" if e["outcome"] == "substituted" else "carried on"
+        add("injury", f'{e["player"]} ({e["team"]}) went down injured in minute {e["minute"]+1}; play was stopped for {e["duration_s"]} seconds and he {tail}',
+            event_id=e["id"], player=e["player"], outcome=e["outcome"])
     rt = ratings(m)
     if rt:
         top = max(rt.items(), key=lambda kv: kv[1]["rating"]); pid, r = top

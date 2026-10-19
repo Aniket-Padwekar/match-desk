@@ -73,6 +73,10 @@ def simulate(seed, home=None, away=None, hs=None, as_=None):
     half_len=2700+rng.randint(30,120)
     add("kickoff",poss,pick(poss,carry_w),50,50)
     set_piece=None
+    rng_i=random.Random(seed*131+5)
+    inj_plan=sorted([(rng_i.choice([1,2]),rng_i.uniform(400,2500) if rng_i.random()<0.45 else rng_i.uniform(2850,5200),rng_i.choice(["home","away"]))
+                     for _ in range(rng_i.choice([0,1,1,2]))])
+    inj_plan=[(p,tt,sd) for p,tt,sd in inj_plan]
     while True:
         if period==1 and t>=half_len:
             add("half_time",poss,None); period=2; t=2700.0
@@ -80,6 +84,17 @@ def simulate(seed, home=None, away=None, hs=None, as_=None):
             add("kickoff",poss,pick(poss,carry_w),50,50); continue
         if period==2 and t>=5400+rng.randint(150,330):
             add("full_time",poss,None); break
+        # injuries (separate random stream; football feeds record the stoppage and why a substitution was made)
+        while inj_plan and inj_plan[0][0]==period and t>=inj_plan[0][1]:
+            _,_,isd=inj_plan.pop(0)
+            cand=[p for p in on[isd] if p["pos"]!="GK"]
+            if not cand: continue
+            hurt=rng_i.choice(cand); off=rng_i.random()<0.5 and subs_done[isd]<3
+            add("injury_stoppage",isd,hurt,rng_i.uniform(15,85),rng_i.uniform(10,90),duration_s=rng_i.choice([30,45,60,90,120,150]),outcome="substituted" if off else "continued")
+            if off:
+                inn=T[isd]["bench"][subs_done[isd]]
+                on[isd][on[isd].index(hurt)]=inn; subs_done[isd]+=1
+                add("substitution",isd,inn,replaces=hurt["name"],reason="injury")
         # substitutions
         if period==2 and t>3600:
             for s in ("home","away"):
@@ -87,7 +102,7 @@ def simulate(seed, home=None, away=None, hs=None, as_=None):
                     out=rng.choice([p for p in on[s] if p["pos"]!="GK"])
                     inn=T[s]["bench"][subs_done[s]]
                     on[s][on[s].index(out)]=inn; subs_done[s]+=1
-                    add("substitution",s,inn,replaces=out["name"])
+                    add("substitution",s,inn,replaces=out["name"],reason="tactical")
         atk=poss; dfn=other(poss)
         # attacking x measured so that 100 = opponent goal for team in possession
         sa=T[atk]["strength"]; sd=T[dfn]["strength"]
