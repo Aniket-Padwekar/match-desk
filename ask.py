@@ -1,0 +1,151 @@
+"""Ask the Match: a question is turned into calls to a small set of deterministic tools over the event log.
+The model never reads raw events and never invents numbers: it plans which tools to call, then explains what the
+tools returned. Every sentence is re-checked (rules + judge) and carries receipts. If the tools cannot answer,
+the answer is a plain 'the data cannot tell', written by code, not by the model."""
+import json, re
+from collections import Counter
+from insight import ratings, explain_rating, why_result
+from engine import key_moments
+
+STATS = {"shots": ["shot"], "goals": ["goal"], "passes": ["pass"], "tackles": ["tackle"], "interceptions": ["interception"], "fouls": ["foul"],
+         "yellow cards": ["yellow_card"], "corners": ["corner"], "saves": ["save"], "dribbles": ["dribble"], "duels": ["duel"], "pressures": ["pressure"]}
+
+TOOL_SPECS = """Tools (call with JSON):
+- score_timeline() : every goal with minute, scorer and running score
+- team_stat(side, stat, from_min, to_min) : side is 'home' or 'away'; stat is one of %s; from_min/to_min optional (match minutes 1-90+)
+- player_stat(player, stat) : counts for one named player (full or last name); stat one of %s, or 'xg'
+- top_players(stat, n) : the n players with the most of a stat (both teams)
+- rating(player) : the published rating formula applied to one player, with the biggest contributors
+- why_result() : the reasons the result did or did not match the chances
+- lineup_info(team) : players and positions of a team
+If the question needs something the event log does not contain (tactics, instructions, injuries, fitness, intentions, opinions, players' speed or distance, anything about other matches or real teams), answer {"unanswerable": "<what is missing>"}.""" % (list(STATS), list(STATS))
+
+def _players(m):
+    out = []
+    for sd in ("home", "away"):
+        for p in m["meta"]["lineups"][sd]["players"] + m["meta"]["lineups"][sd]["bench"]:
+            out.append((p["id"], p["name"], sd, p["pos"]))
+    return out
+
+def _find(m, q):
+    q = q.lower().strip(); P = _players(m)
+    hit = [p for p in P if p[1].lower() == q] or [p for p in P if q and q in p[1].lower()]
+    return hit
+
+def _window(e, lo, hi): return (lo is None or e["minute"] >= lo - 1) and (hi is None or e["minute"] < hi)
+
+def run_tool(m, tool, args):
+    """Returns {"text": str, "receipts": [event ids]} or None if the tool cannot answer."""
+    ev, me = m["events"], m["meta"]; args = args or {}
+    side_name = lambda s: me["home"] if s == "home" else me["away"]
+    if tool == "score_timeline":
+        gs = [e for e in ev if e["type"] == "goal"]
+        if not gs: return {"text": "No goals were scored.", "receipts": []}
+        return {"text": "Goals: " + "; ".join(f'{e["player"]} for {side_name(e["side"])} in minute {e["minute"]+1} ({e["score_home"]}-{e["score_away"]})' for e in gs) + ".",
+                "receipts": [e["id"] for e in gs]}
+    if tool == "team_stat":
+        side, stat = args.get("side"), args.get("stat"); lo, hi = args.get("from_min"), args.get("to_min")
+        if side not in ("home", "away") or stat not in STATS: return None
+        hits = [e for e in ev if e["side"] == side and e["type"] in STATS[stat] and _window(e, lo, hi)]
+        win = f' between minute {lo} and {hi}' if lo and hi else ""
+        return {"text": f'{side_name(side)} had {len(hits)} {stat}{win}.', "receipts": [e["id"] for e in hits][:15]}
+    if tool == "player_stat":
+        hit = _find(m, args.get("player", ""))
+        if not hit: return None
+        if len(hit) > 1: return {"text": "Several players match '" + args["player"] + "': " + ", ".join(f"{p[1]} ({side_name(p[2])})" for p in hit) + ".", "receipts": []}
+        pid, name, sd, pos = hit[0]; stat = args.get("stat")
+        mine = [e for e in ev if e.get("player_id") == pid]
+        if stat == "xg":
+            sh = [e for e in mine if e["type"] == "shot"]
+            return {"text": f'{name} ({side_name(sd)}) had {len(sh)} shots worth {round(sum(e["xg"] for e in sh),2)} expected goals.', "receipts": [e["id"] for e in sh]}
+        if stat not in STATS: return None
+        hits = [e for e in mine if e["type"] in STATS[stat]]
+        return {"text": f'{name} ({side_name(sd)}) had {len(hits)} {stat}.', "receipts": [e["id"] for e in hits][:15]}
+    if tool == "top_players":
+        stat = args.get("stat"); n = int(args.get("n", 3) or 3)
+        if stat not in STATS: return None
+        c = Counter(e["player"] for e in ev if e["type"] in STATS[stat] and e.get("player"))
+        if not c: return {"text": f"Nobody recorded any {stat}.", "receipts": []}
+        top = sorted(c.items(), key=lambda kv: (-kv[1], kv[0]))
+        cut = top[min(n, len(top)) - 1][1]; top = [t for t in top if t[1] >= cut][:max(n, 1)]
+        return {"text": f'Most {stat}: ' + ", ".join(f"{p} {k}" for p, k in top) + ".", "receipts": []}
+    if tool == "rating":
+        hit = _find(m, args.get("player", ""))
+        if len(hit) != 1: return None
+        r = explain_rating(m, hit[0][0]); return {"text": r["text"], "receipts": r["receipts"]}
+    if tool == "why_result":
+        w = why_result(m)
+        if not w: return None
+        return {"text": w["headline"] + " " + " ".join(r["text"] for r in w["reasons"]), "receipts": [i for r in w["reasons"] for i in r["receipts"]][:15]}
+    if tool == "lineup_info":
+        t = (args.get("team") or "").lower()
+        sd = "home" if t in me["home"].lower() or me["home"].lower() in t else "away" if t in me["away"].lower() or me["away"].lower() in t else None
+        if not sd: return None
+        L = me["lineups"][sd]["players"]
+        return {"text": f'{side_name(sd)} started: ' + ", ".join(f'{p["name"]} ({p["pos"]})' for p in L) + ".", "receipts": []}
+    return None
+
+CANNOT = "The match data cannot tell us this: "
+
+class MockPlanner:
+    """Keyword planner used offline so the pipeline can be tested without Azure."""
+    def plan(self, m, q):
+        ql = q.lower(); me = m["meta"]
+        if any(w in ql for w in ["why", "deserve", "unlucky", "lucky"]): return [{"tool": "why_result", "args": {}}]
+        if any(w in ql for w in ["injur", "tired", "fatigue", "tactic", "formation", "manager", "coach", "instruct", "speed", "km", "feel", "best player in the league", "last season", "transfer"]):
+            return {"unanswerable": "this is not recorded in the event log"}
+        if ("goal" in ql or "scor" in ql) and ("who" in ql or "when" in ql): return [{"tool": "score_timeline", "args": {}}]
+        for st in STATS:
+            if st in ql or st.rstrip("s") in ql:
+                if "most" in ql or "who" in ql: return [{"tool": "top_players", "args": {"stat": st, "n": 3}}]
+                side = "home" if me["home"].lower() in ql else "away" if me["away"].lower() in ql else None
+                if side: return [{"tool": "team_stat", "args": {"side": side, "stat": st}}]
+        for _, name, _, _ in _players(m):
+            if name.lower() in ql or name.split()[-1].lower() in ql: return [{"tool": "rating", "args": {"player": name}}]
+        return {"unanswerable": "no tool matches this question"}
+
+def facts_for(m, calls):
+    facts = []
+    for c in calls[:4]:
+        r = run_tool(m, c.get("tool"), c.get("args"))
+        if r: facts.append({"id": len(facts) + 1, "text": r["text"], "receipts": r["receipts"],
+                            "claim": {"kind": "tool", "text": r["text"], "params": {"tool": c.get("tool"), "args": c.get("args") or {}, "text": r["text"]}}})
+    return facts
+
+
+def answer(m, question, llm, audience="fan", lang="English"):
+    """Plan -> run deterministic tools -> write -> re-check (rules + judge) -> answer with receipts, or 'cannot tell'."""
+    from agents import checker
+    trace = []
+    plan = llm.plan(m, question)
+    if isinstance(plan, dict):
+        trace.append({"agent": "Planner", "event": "unanswerable: " + plan["unanswerable"]})
+        return {"question": question, "status": "cannot_tell", "answer": CANNOT + plan["unanswerable"] + ".", "sentences": [], "trace": trace}
+    facts = facts_for(m, plan); fb = {f["id"]: f for f in facts}
+    trace.append({"agent": "Planner", "event": "calls: " + ", ".join(c.get("tool", "?") for c in plan)})
+    if not facts:
+        trace.append({"agent": "Tools", "event": "no tool could answer"})
+        return {"question": question, "status": "cannot_tell", "answer": CANNOT + "none of the available lookups can answer it from this event log.", "sentences": [], "trace": trace}
+    w = llm.answer_write(question, facts, audience, lang)["sentences"]
+    items = [{"i": i, "sentence": s["text"], "cited_facts": [fb[x]["text"] for x in s["fact_ids"] if x in fb]} for i, s in enumerate(w)]
+    judged = llm.judge(items) if items else []
+    out = []
+    for i, s in enumerate(w):
+        ok, why, _ = checker(m, s, fb)
+        if ok and judged[i]:
+            rec = sorted({r for x in s["fact_ids"] for r in fb[x]["receipts"]})
+            out.append({"text": s["text"], "fact_ids": s["fact_ids"], "receipts": rec})
+        else:
+            trace.append({"agent": "Judge" if ok else "FactChecker", "event": "blocked a sentence: " + (why if not ok else "not fully supported")})
+    if not out:   # nothing survived: fall back to the tool facts themselves, which are true by construction
+        out = [{"text": f["text"], "fact_ids": [f["id"]], "receipts": f["receipts"]} for f in facts]
+        trace.append({"agent": "Editor", "event": "used the verified tool output directly"})
+    return {"question": question, "status": "answered", "answer": " ".join(s["text"] for s in out), "sentences": out, "trace": trace}
+
+QUESTIONS = [  # (question, should_be_answerable)
+    ("Who scored and when?", True), ("Who had the most tackles?", True), ("Why did the home team not win?", True),
+    ("How many shots did the away team have?", True), ("Who made the most interceptions?", True), ("How many fouls did the home team commit?", True),
+    ("Which player was rated highest and why?", True), ("How many shots did the home team have between minute 60 and 90?", True),
+    ("Was the manager right to make that substitution?", False), ("Was anyone injured or tired in the second half?", False),
+    ("What formation did the away team play?", False), ("How fast did the fastest player run?", False),
+    ("Is this team better than Bayern Munich?", False), ("Who will win the next match?", False)]

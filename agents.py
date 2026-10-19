@@ -33,6 +33,9 @@ def verify(claim, m):
     if k == "why":
         w = why_result(m); ok = bool(w) and p["reason"] in [r["text"] for r in w["reasons"]]
         return ok, "recomputed from event log"
+    if k == "tool":
+        from ask import run_tool
+        r = run_tool(m, p["tool"], p["args"]); return bool(r) and r["text"] == p["text"], "re-run on the event log"
     if k == "margin":
         h, a = team_stat(ev, "home", "goals"), team_stat(ev, "away", "goals")
         return (h - a) == p["diff"], f"goal difference {h - a}"
@@ -107,6 +110,10 @@ class MockLLM:
                 else: ids = [self.rng.choice([g for g in facts if g["id"] != f["id"]])["id"]]
             out.append({"text": text + ".", "fact_ids": ids, "_mutated": mutated})
         return {"headline": "", "sentences": out}
+    def plan(self, m, q):
+        from ask import MockPlanner; return MockPlanner().plan(m, q)
+    def answer_write(self, question, facts, audience, lang):
+        return {"sentences": [{"text": f["text"], "fact_ids": [f["id"]]} for f in facts]}
     def judge(self, items):
         """Offline stand-in for the LLM judge: supported only if the sentence shares most content words with its cited facts."""
         W = lambda t: {w for w in re.findall(r"[a-zäöüß0-9]+", t.lower()) if len(w) > 2}
@@ -116,7 +123,7 @@ class MockLLM:
         return None if f is None else {"text": f["text"] + ".", "fact_ids": [f["id"]]}
 
 STYLE = {
- "fan": "Write like a friendly match report for someone who watched casually. Plain words. NEVER say 'expected goals' or 'xG' on its own: say 'the quality of chances' and explain in a few words. Tell the story: who scored when, who had the better of it, and why the result came out as it did. Max 7 short sentences.",
+ "fan": "Write like a friendly match report for someone who watched casually. Plain words. Never use the words 'expected goals' or 'xG'. Say 'chances worth 3.6 goals on average (a measure of how good the chances were)' the first time, then 'chance quality'. Tell the story: who scored when, who had the better of it, and why the result came out as it did. Max 7 short sentences.",
  "analyst": "Write for a stats-literate reader. Use the numbers, expected goals (xG), touches share and the 'why' facts. Precise and compact, no filler. Max 7 sentences.",
  "coach": "Write for a coach: what changed, why it mattered, what to take away. Focus on spells, finishing, goalkeeper impact and turning points. No stat dumps. Max 6 sentences."}
 
@@ -132,11 +139,24 @@ class AzureLLM:
         return json.loads(r.choices[0].message.content)
     def write(self, facts, audience, lang):
         sys = ("You are the Storyteller of a verified football match desk. Use ONLY the facts given. Every sentence must cite the fact ids it uses. "
-               "Structure: (1) result, (2) the turning points using the score_after facts, (3) the reason the result came out that way using the 'why' facts, (4) one standout player. Always use full team names, never shortened. Never add a number, name, minute, or comparison that the cited facts do not state. Do not use interpretive words such as 'dominated', 'deserved', 'early', "
+               "Keep every sentence under 25 words and cite at most 3 facts per sentence; several short sentences beat one long one. Structure: (1) result, (2) the turning points using the score_after facts, (3) the reason the result came out that way using the 'why' facts, (4) one standout player. Always use full team names, never shortened. Never add a number, name, minute, or comparison that the cited facts do not state. Do not use interpretive words such as 'dominated', 'deserved', 'early', "
                "'better', 'more' unless a cited fact states the comparison with numbers. Prefer plain description over interpretation. "
                f"Style: {STYLE[audience]} Language: {lang}. "
                'Return JSON: {"headline":"...","sentences":[{"text":"...","fact_ids":[1,2]}]}')
         return self._chat(sys, json.dumps(facts, ensure_ascii=False))
+    def plan(self, m, question):
+        from ask import TOOL_SPECS
+        me = m["meta"]
+        sys = ("You turn a football question about ONE match into tool calls. " + TOOL_SPECS + f" The match is {me['home']} (home) vs {me['away']} (away). "
+               'Return JSON: {"calls":[{"tool":"...","args":{...}}]} or {"unanswerable":"..."}. At most 3 calls.')
+        r = self._chat(sys, question)
+        return r["calls"] if r.get("calls") else {"unanswerable": r.get("unanswerable") or "no tool fits"}
+    def answer_write(self, question, facts, audience, lang):
+        sys = ("You answer a football question using ONLY the facts given. Cite the fact ids used in every sentence. Never add a number, name or comparison that the facts do not state; "
+               "no causes or opinions unless a fact states them. If the facts do not answer the question, say so instead of guessing. "
+               f"Style: {STYLE[audience]} Language: {lang}. Answer in 1-3 short sentences. "
+               'Return JSON: {"sentences":[{"text":"...","fact_ids":[1]}]}')
+        return self._chat(sys, json.dumps({"question": question, "facts": [{"id": f["id"], "text": f["text"]} for f in facts]}, ensure_ascii=False))
     def judge(self, items):
         sys = ("You are a strict football fact judge. For each item, decide whether the sentence is FULLY supported by its cited facts: "
                "every claim, comparison (more/less/better), time word (early/late) and implied cause must be stated or directly follow from the facts. "
