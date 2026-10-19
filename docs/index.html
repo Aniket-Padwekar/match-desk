@@ -1,0 +1,329 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Match Desk</title></head><body>
+
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a matchday control room. Scoreboard on top, one working column on the left, a live pitch on the right. */
+:root{
+  --bg:#edf1ee; --surface:#f8faf8; --raise:#ffffff; --ink:#14231b; --muted:#566860; --line:#d3dcd6;
+  --accent:#1d7a4b; --accent-soft:#dcefe3; --home:#2f5fa8; --away:#c2631c; --bad:#b3362b; --bad-soft:#f6dcd8; --warn:#8a6a00; --warn-soft:#f5ecc8; --pitch:#e2ece5; --pitch-line:#9fb5a8;
+  --display:"Barlow Condensed","Arial Narrow",sans-serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1512; --surface:#131e19; --raise:#192720; --ink:#e5eee8; --muted:#92a69a; --line:#27372f;
+  --accent:#45c486; --accent-soft:#17382a; --home:#7aa8f2; --away:#f2a45f; --bad:#f28276; --bad-soft:#40201c; --warn:#e3c04f; --warn-soft:#3a3214; --pitch:#15261d; --pitch-line:#3c5648; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d1512; --surface:#131e19; --raise:#192720; --ink:#e5eee8; --muted:#92a69a; --line:#27372f;
+  --accent:#45c486; --accent-soft:#17382a; --home:#7aa8f2; --away:#f2a45f; --bad:#f28276; --bad-soft:#40201c; --warn:#e3c04f; --warn-soft:#3a3214; --pitch:#15261d; --pitch-line:#3c5648; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5;padding-block:0 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1180px;margin:0 auto}
+h1,h2,h3{margin:0;font-weight:600}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:space-between;padding:18px 0 14px}
+.brand{font-family:var(--display);font-weight:700;font-size:28px;letter-spacing:.06em;text-transform:uppercase;line-height:1}
+.brand small{display:block;font-family:var(--body);font-weight:400;font-size:12px;letter-spacing:0;text-transform:none;color:var(--muted);margin-top:4px}
+.picker{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--muted)}
+select{font:inherit;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:7px 10px;max-width:100%}
+.board{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px 16px}
+.score{display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:center}
+.team{font-family:var(--display);font-weight:600;font-size:clamp(26px,4.4vw,46px);line-height:1;text-transform:uppercase;letter-spacing:.02em;min-width:0;overflow-wrap:anywhere}
+.team.h{color:var(--home)} .team.a{color:var(--away);text-align:right}
+.team small{display:block;font-family:var(--body);font-size:11px;letter-spacing:.08em;color:var(--muted);margin-top:4px;font-weight:500}
+.num{font-family:var(--display);font-weight:700;font-size:clamp(40px,7vw,72px);line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.verdict{display:inline-block;margin-top:10px;font-size:12px;padding:3px 10px;border-radius:99px;background:var(--warn-soft);color:var(--warn);font-weight:500}
+.verdict.ok{background:var(--accent-soft);color:var(--accent)}
+.tape{display:grid;gap:7px;margin-top:14px;max-width:640px;margin-inline:auto}
+.tr{display:grid;grid-template-columns:3.2em 1fr auto 1fr 3.2em;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
+.tr b{font-family:var(--mono);font-weight:500;color:var(--ink);font-size:12px}
+.tr b:first-child{text-align:right}
+.bar{height:6px;background:var(--line);border-radius:3px;position:relative;overflow:hidden}
+.bar i{position:absolute;top:0;bottom:0}
+.bar.l i{right:0;background:var(--home)} .bar.r i{left:0;background:var(--away)}
+.tr span{text-align:center;min-width:7.5em}
+.tabs{display:flex;gap:4px;margin:18px 0 14px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{background:none;border:0;padding:10px 14px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:620px){.score{grid-template-columns:minmax(0,1fr);gap:6px;text-align:center}.team,.team.a{text-align:center;font-size:30px}.rw{grid-template-columns:7em 1fr 4em}.agents li,.trace li{grid-template-columns:1fr}.tr{grid-template-columns:2.8em 1fr 6.2em 1fr 2.8em;gap:5px}.tr span{min-width:0;font-size:11px}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;min-width:0}
+.panel.pitchp{position:sticky;top:12px}
+@media (max-width:900px){.panel.pitchp{position:static}}
+.eyebrow{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:500}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;background:var(--bg)}
+.seg button{background:none;border:0;padding:6px 12px;font-size:13px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:#fff}
+.headline{font-family:var(--display);font-weight:600;font-size:clamp(28px,4vw,40px);line-height:1.05;margin:14px 0 12px;text-wrap:balance}
+.sent{display:block;width:100%;text-align:left;background:none;border:1px solid transparent;border-radius:8px;padding:9px 10px;margin:2px -10px;width:calc(100% + 20px)}
+.sent:hover{background:var(--raise)}
+.sent[aria-pressed="true"]{background:var(--raise);border-color:var(--accent)}
+.sent p{margin:0 0 5px;font-size:15.5px}
+.chips{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.chip{font-family:var(--mono);font-size:11px;padding:1px 7px;border-radius:4px;background:var(--bg);border:1px solid var(--line);color:var(--muted)}
+.chip.ok{background:var(--accent-soft);border-color:transparent;color:var(--accent);font-family:var(--body);font-weight:500}
+.chip.no{background:var(--bad-soft);border-color:transparent;color:var(--bad);font-family:var(--body);font-weight:500}
+.note{font-size:13px;color:var(--muted)}
+.src{font-size:12px;padding:8px 10px;border-radius:7px;background:var(--warn-soft);color:var(--warn);margin-bottom:12px}
+.flow{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.step{font-size:12px;padding:3px 9px;border-radius:99px;border:1px solid var(--line);background:var(--bg)}
+.trace{margin:8px 0 0;padding:0;list-style:none;font-size:13px;display:grid;gap:5px}
+.trace li{display:grid;grid-template-columns:7.5em 1fr;gap:8px}
+.trace b{font-weight:600}
+details>summary{cursor:pointer;color:var(--muted);font-size:13px}
+.pitch{width:100%;height:auto;display:block;border-radius:6px}
+.pitch .ground{fill:var(--pitch)} .pitch .ln{fill:none;stroke:var(--pitch-line);stroke-width:.35}
+.pitch .h{fill:var(--home);stroke:var(--surface)} .pitch .a{fill:var(--away);stroke:var(--surface)}
+.pitch .ph{stroke:var(--home)} .pitch .pa{stroke:var(--away)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted);margin-top:8px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:-1px}
+.facts{margin:10px 0 0;padding:0;list-style:none;display:grid;gap:6px;font-size:13px}
+.facts li{padding:7px 9px;background:var(--bg);border-radius:6px;display:grid;gap:3px}
+.ctrl{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px}
+.play{background:var(--accent);color:#fff;border:0;border-radius:7px;padding:7px 16px;font-weight:600;min-width:84px}
+input[type=range]{flex:1;min-width:140px;accent-color:var(--accent)}
+.clock{font-family:var(--display);font-weight:600;font-size:34px;line-height:1;min-width:2.6em;font-variant-numeric:tabular-nums}
+.scorebug{font-family:var(--display);font-weight:600;font-size:26px;font-variant-numeric:tabular-nums}
+.feed{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:7px;max-height:420px;overflow:auto}
+.feed li{display:grid;grid-template-columns:3.2em 1fr;gap:10px;padding:8px 10px;background:var(--bg);border-radius:7px;border-left:3px solid var(--line);font-size:14px}
+.feed li.h{border-left-color:var(--home)} .feed li.a{border-left-color:var(--away)}
+.feed li.goal{background:var(--accent-soft)}
+.feed li .m{font-family:var(--display);font-weight:600;font-size:18px}
+.feed li.fresh{outline:1px solid var(--accent)}
+.qs{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0 14px}
+.q{background:var(--bg);border:1px solid var(--line);border-radius:99px;padding:6px 12px;font-size:13px}
+.q[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft)}
+.q.nope{border-style:dashed}
+.answer{border-radius:8px;padding:14px 16px;background:var(--raise);border:1px solid var(--line)}
+.answer.cant{background:var(--warn-soft);border-color:transparent}
+.answer .big{font-size:17px;margin:6px 0 10px}
+form.ask{display:flex;gap:8px;margin-bottom:6px}
+input[type=text],textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:8px 10px;width:100%}
+.go{background:var(--accent);color:#fff;border:0;border-radius:7px;padding:8px 16px;font-weight:600}
+.ghost{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:6px 11px;font-size:13px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:12px 0}
+.stat{background:var(--bg);border-radius:8px;padding:12px 14px}
+.stat b{display:block;font-family:var(--display);font-size:42px;font-weight:700;line-height:1}
+.stat span{font-size:13px;color:var(--muted)}
+.rows{display:grid;gap:7px;margin-top:8px}
+.rw{display:grid;grid-template-columns:9.5em 1fr 4.5em;gap:10px;align-items:center;font-size:13px}
+.rw .bar{height:8px}.rw .bar i{left:0;right:auto;background:var(--accent)}
+.rw code{font-family:var(--mono);text-align:right}
+.agents{display:grid;gap:8px;margin:10px 0 0;padding:0;list-style:none;counter-reset:a}
+.agents li{display:grid;grid-template-columns:9em 1fr;gap:10px;font-size:14px;padding:9px 11px;background:var(--bg);border-radius:7px}
+.agents b{font-family:var(--display);font-size:19px;font-weight:600}
+.verdictbox{margin-top:10px;padding:10px 12px;border-radius:7px;font-size:14px}
+.verdictbox.ok{background:var(--accent-soft);color:var(--ink)} .verdictbox.no{background:var(--bad-soft)} .verdictbox.warn{background:var(--warn-soft)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;align-items:start}
+.mini{width:100%;height:auto;display:block}
+.mini text{font-family:var(--body);font-size:3.2px;fill:var(--muted)}
+footer{margin-top:28px;font-size:12px;color:var(--muted);max-width:760px}
+.loading{padding:40px 0;color:var(--muted)}
+@media (prefers-reduced-motion: reduce){*{scroll-behavior:auto!important}}
+</style>
+
+<div class="wrap" id="app"><div class="loading">Loading the matches.</div></div>
+
+<script>
+"use strict";
+const $ = (s, el = document) => el.querySelector(s);
+const esc = t => String(t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const S = { data: null, recaps: null, ask: null, score: null, mi: 0, tab: "recap", aud: "fan:English", sel: null, askSel: 0, t: 0, playing: false, speed: 1, timer: null, tryIdx: 0, tryText: null };
+const LABELS = { against_run_of_play: ["Result went against the chances", false], matched: ["Result matched the chances", true], even: ["Evenly matched", true], draw_vs_edge: ["Draw, though one side had the edge", false] };
+const AUDS = [["fan:English", "Fan"], ["analyst:English", "Analyst"], ["coach:German", "Coach (Deutsch)"]];
+const M = () => S.data.matches[S.mi];
+const ev = () => M().events.map(r => Object.fromEntries(M().cols.map((c, i) => [c, r[i]])));
+let EV = [], EVBYID = {};
+function prep(){ EV = ev(); EVBYID = {}; EV.forEach(e => EVBYID[e.id] = e); }
+const tOf = e => e.minute + e.second / 60;
+
+/* ---------- pitch ---------- */
+const PW = 105, PH = 68;
+const px = (e, k = "x") => { const v = k === "x" ? e.x : e.y; const e2 = k === "x" ? e.end_x : e.end_y; return v; };
+function pos(e, x, y){ const fx = e.side === "home" ? x : 100 - x, fy = e.side === "home" ? y : 100 - y; return [fx / 100 * PW, fy / 100 * PH]; }
+function pitchBase(){
+  return `<rect class="ground" width="${PW}" height="${PH}"/><g class="ln"><rect x=".3" y=".3" width="${PW-.6}" height="${PH-.6}"/><line x1="${PW/2}" y1=".3" x2="${PW/2}" y2="${PH-.3}"/><circle cx="${PW/2}" cy="${PH/2}" r="9.15"/>
+  <rect x=".3" y="${PH/2-20.15}" width="16.5" height="40.3"/><rect x="${PW-16.8}" y="${PH/2-20.15}" width="16.5" height="40.3"/><rect x=".3" y="${PH/2-9.15}" width="5.5" height="18.3"/><rect x="${PW-5.8}" y="${PH/2-9.15}" width="5.5" height="18.3"/></g>`;
+}
+function mark(e, big){
+  const [x, y] = pos(e, e.x, e.y); const c = e.side === "home" ? "h" : "a";
+  if (e.type === "goal") return `<g><circle class="${c}" cx="${x}" cy="${y}" r="${big ? 2.6 : 2.1}" stroke-width=".5"/><circle cx="${x}" cy="${y}" r="${(big ? 2.6 : 2.1) + 1.4}" fill="none" stroke="var(--ink)" stroke-width=".4"/></g>`;
+  if (e.type === "shot") return `<circle class="${c}" cx="${x}" cy="${y}" r="${(0.9 + 3.4 * Math.sqrt(e.xg || .05)).toFixed(2)}" fill-opacity=".78" stroke-width=".3"/>`;
+  if (e.type === "yellow_card") return `<rect x="${x-.9}" y="${y-1.3}" width="1.8" height="2.6" fill="#e8c21a" stroke="var(--ink)" stroke-width=".2"/>`;
+  if (e.type === "foul") return `<path d="M${x-1} ${y-1}L${x+1} ${y+1}M${x+1} ${y-1}L${x-1} ${y+1}" stroke="var(--ink)" stroke-width=".4"/>`;
+  if (e.type === "save") return `<rect class="${c}" x="${x-1}" y="${y-1}" width="2" height="2" stroke-width=".2"/>`;
+  return `<circle class="${c}" cx="${x}" cy="${y}" r=".9" fill-opacity=".8" stroke-width=".15"/>`;
+}
+function pitchHTML(items, opts = {}){
+  let g = "";
+  (opts.lines || []).forEach(e => { if (e.end_x == null) return; const [x1, y1] = pos(e, e.x, e.y), [x2, y2] = pos(e, e.end_x, e.end_y); g += `<line class="${e.side === "home" ? "ph" : "pa"}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke-width=".35" stroke-opacity="${e._o ?? .5}"/>`; });
+  items.forEach(e => { if (e.x != null) g += mark(e, opts.big); });
+  return `<svg class="pitch" viewBox="-3 -3 ${PW+6} ${PH+6}" role="img" aria-label="Pitch map">${pitchBase()}${g}</svg>`;
+}
+const legendHTML = () => `<div class="legend"><span><i class="dot" style="background:var(--home)"></i>${esc(M().home)} attacks right</span><span><i class="dot" style="background:var(--away)"></i>${esc(M().away)} attacks left</span><span>Circle size = chance quality</span></div>`;
+
+/* ---------- shell ---------- */
+function shell(){
+  const m = M(); const [lab, good] = LABELS[m.label] || [m.label, true]; const st = m.stats;
+  const row = (name, a, b, fmt = v => v) => { const tot = (a + b) || 1; return `<div class="tr"><b>${fmt(a)}</b><div class="bar l"><i style="width:${100*a/tot}%"></i></div><span>${name}</span><div class="bar r"><i style="width:${100*b/tot}%"></i></div><b>${fmt(b)}</b></div>`; };
+  $("#app").innerHTML = `
+  <header class="top"><div class="brand">Match Desk<small>Match stories where every sentence shows its receipts</small></div>
+   <label class="picker">Match <select id="msel">${S.data.matches.map((x, i) => `<option value="${i}" ${i === S.mi ? "selected" : ""}>${esc(x.home)} ${x.score[0]}–${x.score[1]} ${esc(x.away)}</option>`).join("")}</select></label></header>
+  <section class="board" aria-label="Scoreboard"><div class="score"><div class="team h">${esc(m.home)}<small>HOME</small></div><div class="num">${m.score[0]}–${m.score[1]}</div><div class="team a">${esc(m.away)}<small>AWAY</small></div></div>
+   <div style="text-align:center"><span class="verdict ${good ? "ok" : ""}">${lab}</span></div>
+   <div class="tape">${row("Shots", st.home.shots, st.away.shots)}${row("Chance quality", st.home.xg, st.away.xg)}${row("Share of touches", st.home.poss, st.away.poss, v => v + "%")}${row("Saves", st.home.saves, st.away.saves)}</div></section>
+  <nav class="tabs" role="tablist">${[["recap", "Recap"], ["replay", "Replay"], ["ask", "Ask the match"], ["trust", "Can you trust it?"]].map(([k, v]) => `<button class="tab" role="tab" id="tab-${k}" aria-selected="${S.tab === k}" data-tab="${k}">${v}</button>`).join("")}</nav>
+  <main id="view"></main>
+  <footer>All matches, clubs and players are invented by a simulator. No real club, player or league data is used. Any resemblance to real people or clubs is coincidental.</footer>`;
+  $("#msel").onchange = e => { S.mi = +e.target.value; S.sel = null; S.t = 0; stop(); prep(); shell(); };
+  document.querySelectorAll(".tab").forEach(b => b.onclick = () => { S.tab = b.dataset.tab; stop(); try { history.replaceState(null, "", "#" + S.tab); } catch (e) {} shell(); });
+  ({ recap: viewRecap, replay: viewReplay, ask: viewAsk, trust: viewTrust })[S.tab]();
+}
+
+/* ---------- recap ---------- */
+const factById = id => M().facts.find(f => f.id === id);
+const evsOf = ids => [...new Set(ids.flatMap(i => (factById(i) || { events: [] }).events))].map(i => EVBYID[i]).filter(Boolean);
+function viewRecap(){
+  const m = M(), r = (S.recaps.recaps[m.id] || {})[S.aud]; const v = $("#view");
+  if (!r) { v.innerHTML = `<div class="panel">No recap for this combination.</div>`; return; }
+  const src = S.recaps.source === "placeholder" ? `<div class="src">Preview text from the offline stand-in, not from the AI model. The real recaps come from the full pipeline run.</div>` : "";
+  const st = r.stats || {}, bf = st.blocked_first_pass ?? ((st.blocked_by_rules || 0) + (st.blocked_by_judge || 0));
+  v.innerHTML = `<div class="grid"><section class="panel">${src}
+   <div class="ctrl"><div class="seg" role="group" aria-label="Audience">${AUDS.map(([k, l]) => `<button aria-pressed="${S.aud === k}" data-aud="${k}">${l}</button>`).join("")}</div></div>
+   <div class="eyebrow">${S.recaps.source === "placeholder" ? "Preview" : "Written by " + esc(S.recaps.model || "the model")} · checked against the event log</div>
+   <h2 class="headline">${esc(r.headline || "")}</h2>
+   <div id="sents">${r.sentences.map((s, i) => `<button class="sent" data-i="${i}" aria-pressed="${S.sel === i}"><p>${esc(s.text)}</p><span class="chips"><span class="chip ok">Verified</span>${(s.receipts || []).slice(0, 5).map(x => `<span class="chip">${esc(x)}</span>`).join("")}</span></button>`).join("")}</div>
+   <p class="note" style="margin-top:12px">Select a sentence to see the facts behind it and where they happened on the pitch.</p>
+   <details style="margin-top:10px"><summary>How this recap was made · ${st.drafted ?? r.sentences.length} drafted, ${bf} blocked, ${st.fixed ?? 0} rewritten, ${st.dropped ?? 0} dropped</summary>
+    <ul class="trace">${(r.trace || []).map(t => `<li><b>${esc(t.agent)}</b><span>${esc(t.event)}</span></li>`).join("") || "<li><b>Checker</b><span>Every drafted sentence passed on the first try.</span></li>"}</ul></details></section>
+   <aside class="panel pitchp"><div class="eyebrow">Evidence on the pitch</div><div id="pv"></div><div id="why"></div></aside></div>`;
+  document.querySelectorAll("[data-aud]").forEach(b => b.onclick = () => { S.aud = b.dataset.aud; S.sel = null; viewRecap(); });
+  document.querySelectorAll(".sent").forEach(b => b.onclick = () => { S.sel = +b.dataset.i; document.querySelectorAll(".sent").forEach(x => x.setAttribute("aria-pressed", x === b)); showEvidence(r); });
+  showEvidence(r);
+}
+function showEvidence(r){
+  const s = S.sel == null ? null : r.sentences[S.sel]; const es = s ? evsOf(s.fact_ids) : [];
+  $("#pv").innerHTML = pitchHTML(es, { big: true }) + legendHTML();
+  $("#why").innerHTML = s ? `<div class="eyebrow" style="margin-top:12px">Facts this sentence rests on</div><ul class="facts">${s.fact_ids.map(i => { const f = factById(i); return f ? `<li><span>${esc(f.text)}</span><span class="chips"><span class="chip">fact ${f.id}</span>${f.events.slice(0, 4).map(e => `<span class="chip">event #${e}</span>`).join("")}</span></li>` : ""; }).join("")}</ul>` : `<p class="note" style="margin-top:12px">Nothing selected yet.</p>`;
+}
+
+/* ---------- replay ---------- */
+function stop(){ S.playing = false; clearInterval(S.timer); }
+function xgSeries(){
+  const m = M(), last = 96, ser = { home: [0], away: [0] }; const sh = EV.filter(e => e.type === "shot" || e.type === "goal");
+  for (let k = 1; k <= last; k++) for (const sd of ["home", "away"]) ser[sd].push(+(sh.filter(e => e.side === sd && tOf(e) < k).reduce((a, e) => a + (e.xg || 0), 0)).toFixed(2));
+  return ser;
+}
+function xgChart(t){
+  const ser = xgSeries(), mx = Math.max(1, ...ser.home, ...ser.away), W = 100, H = 40, L = 8, B = 8;
+  const X = k => L + (k / 96) * (W - L - 2), Y = v => H - B - (v / mx) * (H - B - 3);
+  const path = a => a.map((v, k) => `${k ? "L" : "M"}${X(k).toFixed(1)} ${Y(v).toFixed(1)}`).join("");
+  const goals = EV.filter(e => e.type === "goal").map(e => `<circle cx="${X(tOf(e))}" cy="${Y(ser[e.side][Math.min(96, Math.round(tOf(e)))])}" r="1.3" fill="${e.side === "home" ? "var(--home)" : "var(--away)"}" stroke="var(--ink)" stroke-width=".3"/>`).join("");
+  const ticks = [0, 15, 30, 45, 60, 75, 90].map(k => `<text x="${X(k)}" y="${H-1}" text-anchor="middle">${k}'</text><line x1="${X(k)}" x2="${X(k)}" y1="${Y(0)}" y2="${Y(0)+1}" stroke="var(--line)" stroke-width=".3"/>`).join("");
+  return `<svg class="mini" viewBox="0 0 ${W} ${H}" role="img" aria-label="Chance quality built up over the match"><line x1="${L}" x2="${W-2}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line)" stroke-width=".3"/><text x="0" y="${Y(mx)+1}">${mx.toFixed(1)}</text><text x="1" y="${Y(0)}">0</text>
+   <path d="${path(ser.home)}" fill="none" stroke="var(--home)" stroke-width=".9"/><path d="${path(ser.away)}" fill="none" stroke="var(--away)" stroke-width=".9"/>${goals}${ticks}<line id="cur" x1="${X(t)}" x2="${X(t)}" y1="3" y2="${Y(0)}" stroke="var(--ink)" stroke-width=".4" stroke-dasharray="1 1"/></svg>`;
+}
+function viewReplay(){
+  const m = M(); $("#view").innerHTML = `<div class="grid"><section class="panel">
+   <div class="ctrl"><button class="play" id="pl">Play</button><div class="clock" id="clk">0'</div><div class="scorebug" id="sb"></div></div>
+   <div class="ctrl"><input type="range" id="sc" min="0" max="96" step="0.1" value="${S.t}" aria-label="Match minute"><div class="seg" role="group" aria-label="Speed">${[1, 2, 4].map(k => `<button aria-pressed="${S.speed === k}" data-sp="${k}">${k}x</button>`).join("")}</div></div>
+   <div class="eyebrow">Chance quality over the match</div><div id="xg"></div>
+   <div class="eyebrow" style="margin-top:12px">Match feed · written by code from the event log</div><ul class="feed" id="feed"></ul></section>
+   <aside class="panel pitchp"><div class="eyebrow">Last five minutes on the pitch</div><div id="pv"></div>${legendHTML()}</aside></div>`;
+  $("#pl").onclick = () => { S.playing ? stop() : play(); drawReplay(); };
+  $("#sc").oninput = e => { S.t = +e.target.value; drawReplay(); };
+  document.querySelectorAll("[data-sp]").forEach(b => b.onclick = () => { S.speed = +b.dataset.sp; document.querySelectorAll("[data-sp]").forEach(x => x.setAttribute("aria-pressed", x === b)); });
+  drawReplay();
+}
+function play(){ if (S.t >= 95.9) S.t = 0; S.playing = true; clearInterval(S.timer); S.timer = setInterval(() => { S.t = Math.min(96, S.t + 0.1 * S.speed); if (S.t >= 96) stop(); drawReplay(); }, 50); }
+function drawReplay(){
+  if (S.tab !== "replay") return; const t = S.t, m = M();
+  const win = EV.filter(e => tOf(e) <= t && tOf(e) > t - 5 && e.x != null);
+  const lines = win.filter(e => e.type === "pass" && tOf(e) > t - 0.7).map(e => ({ ...e, _o: .15 + .5 * (1 - (t - tOf(e)) / 0.7) }));
+  const shown = win.filter(e => ["shot", "goal", "foul", "yellow_card", "save", "tackle", "interception"].includes(e.type));
+  $("#pv").innerHTML = pitchHTML(shown, { lines });
+  const goals = EV.filter(e => e.type === "goal" && tOf(e) <= t); const h = goals.filter(e => e.side === "home").length, a = goals.length - h;
+  $("#clk").textContent = Math.floor(t) + "'"; $("#sb").innerHTML = `<span style="color:var(--home)">${esc(m.home)}</span> ${h}–${a} <span style="color:var(--away)">${esc(m.away)}</span>`;
+  $("#xg").innerHTML = xgChart(t); $("#sc").value = t; $("#pl").textContent = S.playing ? "Pause" : (t >= 95.9 ? "Replay" : "Play");
+  const items = m.timeline.filter(x => x.minute <= t + 0.01).reverse();
+  $("#feed").innerHTML = items.length ? items.map((x, i) => `<li class="${x.side === "home" ? "h" : "a"} ${x.kind === "goal" ? "goal" : ""} ${i === 0 && t - x.minute < 2 ? "fresh" : ""}"><span class="m">${x.minute}'</span><span>${esc(x.text)}</span></li>`).join("") : `<li><span class="m">0'</span><span>Kick-off.</span></li>`;
+}
+
+/* ---------- ask ---------- */
+function viewAsk(){
+  const m = M(), list = S.ask.ask[m.id] || []; const cur = list[S.askSel] || list[0]; const src = S.ask.source === "placeholder" ? `<div class="src">Preview answers from the offline stand-in. The real answers come from the AI planner and checker.</div>` : "";
+  $("#view").innerHTML = `<div class="grid"><section class="panel">${src}
+   <form class="ask" id="af"><input type="text" id="aq" placeholder="Ask about this match" aria-label="Ask a question"><button class="go">Ask</button></form>
+   <p class="note" id="amsg">This demo answers from a stored set of questions for each match. Pick one below or type something close to it.</p>
+   <div class="qs">${list.map((q, i) => `<button class="q ${q.status === "cannot_tell" ? "nope" : ""}" data-q="${i}" aria-pressed="${i === S.askSel}">${esc(q.question)}</button>`).join("")}</div>
+   <div id="ans"></div></section>
+   <aside class="panel pitchp"><div class="eyebrow">Evidence on the pitch</div><div id="pv"></div>${legendHTML()}</aside></div>`;
+  document.querySelectorAll("[data-q]").forEach(b => b.onclick = () => { S.askSel = +b.dataset.q; viewAsk(); });
+  $("#af").onsubmit = e => { e.preventDefault(); const q = $("#aq").value.toLowerCase().match(/[a-zäöü0-9]+/g) || []; if (!q.length) return;
+    let best = -1, bi = 0; list.forEach((x, i) => { const w = new Set(x.question.toLowerCase().match(/[a-zäöü0-9]+/g)); const sc = q.filter(t => w.has(t)).length / Math.max(q.length, w.size / 2); if (sc > best) { best = sc; bi = i; } });
+    if (best >= .5) { S.askSel = bi; viewAsk(); } else $("#amsg").textContent = "No stored question is close to that. In the full pipeline a new question is planned and answered live; this public demo has no live model so nobody can run up a bill."; };
+  if (!cur) return;
+  const ok = cur.status === "answered";
+  const rec = [...new Set((cur.sentences || []).flatMap(s => s.receipts || []))];
+  $("#ans").innerHTML = `<div class="answer ${ok ? "" : "cant"}"><div class="eyebrow">${ok ? "Answer, checked" : "The data cannot tell"}</div><div class="big">${esc(cur.answer)}</div>
+    ${ok ? `<div class="chips"><span class="chip ok">Verified</span>${rec.slice(0, 8).map(r => `<span class="chip">event #${r}</span>`).join("")}${rec.length > 8 ? `<span class="chip">+${rec.length - 8} more</span>` : ""}</div>` : `<p class="note" style="margin:0">Refusing is the correct answer here. Nothing in the event log covers this, so nothing is guessed.</p>`}
+    <details style="margin-top:10px"><summary>How it was answered</summary><ul class="trace">${(cur.trace || []).map(t => `<li><b>${esc(t.agent)}</b><span>${esc(t.event)}</span></li>`).join("")}</ul></details></div>`;
+  $("#pv").innerHTML = pitchHTML(rec.map(i => EVBYID[i]).filter(Boolean), { big: true });
+}
+
+/* ---------- trust ---------- */
+const NUMW = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, zwei: 2, drei: 3, vier: 4, "fünf": 5, sechs: 6, sieben: 7, acht: 8, neun: 9, zehn: 10, elf: 11, "zwölf": 12 };
+function nums(t){ const s = new Set((t.match(/\d+(?:[.,]\d+)?/g) || []).map(x => x.replace(",", "."))); (t.toLowerCase().match(/[a-zäöüß]+/g) || []).forEach(w => { if (NUMW[w]) s.add(String(NUMW[w])); }); return s; }
+function ruleCheck(text, ids){
+  const m = M(), facts = ids.map(factById).filter(Boolean); const out = [];
+  if (!facts.length) return [["no", "No valid fact is cited, so there is nothing to check this sentence against."]];
+  const ft = facts.map(f => f.text).join(" "); const allowed = new Set(); facts.forEach(f => nums(f.text).forEach(n => allowed.add(n)));
+  const stray = [...nums(text)].filter(n => !allowed.has(n)); if (stray.length) out.push(["no", `The number ${stray.join(", ")} does not appear in the cited facts.`]);
+  [m.home, m.away].forEach(t => { const first = t.split(" ")[0], rest = t.split(" ").slice(1).join(" "); if (new RegExp("\\b" + first + "\\b(?!\\s+" + rest.split(" ")[0] + ")").test(text)) out.push(["no", `"${first}" is a shortened team name. Use "${t}".`]); if (text.includes(t) && !ft.includes(t)) out.push(["no", `${t} is not mentioned in the cited facts.`]); });
+  const poss = facts.find(f => /touches/.test(f.text)); if (poss && /more possession|mehr ballbesitz|dominated possession|controlled the ball/i.test(text)) { const p = +(poss.text.match(/(\d+)%/) || [0, 50])[1]; if (p <= 50) out.push(["no", `The sentence claims more possession, but the cited share is ${p}%.`]); }
+  if (/\b(because|due to|thanks to|deserved|dominated|weil|dank|verdient)\b/i.test(text)) out.push(["warn", "Causal or judging wording. The rule layer cannot decide this; the Judge (a second model call) checks it against the cited facts."]);
+  return out.length ? out : [["ok", "Passes the rule layer: citations exist, every number and name appears in the cited facts."]];
+}
+function viewTrust(){
+  const sc = S.score, rc = (S.recaps.recaps[M().id] || {})[S.aud] || Object.values(S.recaps.recaps[M().id])[0]; const sents = rc.sentences;
+  const pct = (a, b) => (100 * a / b).toFixed(1);
+  if (S.tryText == null) S.tryText = sents[Math.min(S.tryIdx, sents.length - 1)].text;
+  const cur = sents[Math.min(S.tryIdx, sents.length - 1)];
+  $("#view").innerHTML = `<div class="two"><section class="panel"><div class="eyebrow">Measured, not claimed</div>
+   <h2 class="headline" style="font-size:30px">We plant errors on purpose and count how many get caught</h2>
+   <div class="stats"><div class="stat"><b>${pct(sc.caught, sc.planted_errors)}%</b><span>${sc.caught} of ${sc.planted_errors} planted errors caught</span></div><div class="stat"><b>${sc.wrongly_blocked} of ${sc.true_sentences}</b><span>true sentences wrongly blocked</span></div></div>
+   <div class="eyebrow">By kind of error</div><div class="rows">${Object.entries(sc.by_kind).map(([k, [a, b]]) => `<div class="rw"><span>${esc(k)}</span><div class="bar"><i style="width:${100*a/b}%"></i></div><code>${a}/${b}</code></div>`).join("")}</div>
+   <p class="note" style="margin-top:12px">${sc.matches} simulated matches, ${esc(sc.model)} as writer and judge. The planted errors are simple, such as a changed number or swapped team, and the same model family writes and judges, so real-world accuracy will be lower. The misses were citations pointing at a different fact that says the same thing. Every figure here can be re-run from the repository.</p></section>
+  <section class="panel"><div class="eyebrow">Five agents, each with one job</div><ol class="agents">
+   <li><b>Stats analyst</b><span>Computes facts from the event log by code. No model. Builds the shared case file.</span></li>
+   <li><b>Storyteller</b><span>Model. Writes in the chosen style and language using only the case file, citing fact numbers.</span></li>
+   <li><b>Fact checker</b><span>Code. Re-derives each cited fact from the raw events, then checks numbers, names and comparison words.</span></li>
+   <li><b>Judge</b><span>Second model call. Rejects causes and comparisons the facts do not state.</span></li>
+   <li><b>Editor</b><span>Rewrites a blocked sentence from its own facts, re-checks it, or drops it. Nothing unchecked is shown.</span></li></ol></section></div>
+  <section class="panel" style="margin-top:20px"><div class="eyebrow">Try to break it</div><h2 class="headline" style="font-size:28px;margin-top:8px">Edit a sentence and run the rule layer</h2>
+   <div class="ctrl"><select id="ts" aria-label="Sentence to edit">${sents.map((s, i) => `<option value="${i}" ${i === S.tryIdx ? "selected" : ""}>${esc(s.text.slice(0, 70))}</option>`).join("")}</select>
+    <button class="ghost" id="b1">Change a number</button><button class="ghost" id="b2">Swap the teams</button><button class="ghost" id="b3">Add a cause</button><button class="ghost" id="b4">Reset</button></div>
+   <textarea id="tt" rows="3" aria-label="Sentence text">${esc(S.tryText)}</textarea>
+   <p class="note">It cites fact ${cur.fact_ids.join(", ")}. This runs the same rules as the pipeline, in your browser. The Judge needs a model call and does not run here.</p><div id="tv"></div></section>`;
+  const run = () => { S.tryText = $("#tt").value; $("#tv").innerHTML = ruleCheck(S.tryText, cur.fact_ids).map(([k, t]) => `<div class="verdictbox ${k}"><b>${k === "ok" ? "Passes" : k === "no" ? "Blocked" : "Needs the Judge"}.</b> ${esc(t)}</div>`).join(""); };
+  $("#tt").oninput = run; run();
+  $("#ts").onchange = e => { S.tryIdx = +e.target.value; S.tryText = null; viewTrust(); };
+  $("#b1").onclick = () => { $("#tt").value = $("#tt").value.replace(/\d+(?:\.\d+)?/, n => String(+n + 2)); run(); };
+  $("#b2").onclick = () => { const a = M().home, b = M().away; $("#tt").value = $("#tt").value.split(a).join("\u0001").split(b).join(a).split("\u0001").join(b); run(); };
+  $("#b3").onclick = () => { $("#tt").value = $("#tt").value.replace(/\.?\s*$/, " because they pressed higher up the pitch."); run(); };
+  $("#b4").onclick = () => { S.tryText = null; viewTrust(); };
+}
+
+/* ---------- boot ---------- */
+async function boot(){
+  try {
+    const get = async f => (await fetch("data/" + f)).json();
+    [S.data, S.recaps, S.ask, S.score] = await Promise.all(["matches.json", "recaps.json", "ask.json", "scorecard.json"].map(get));
+  } catch (e) { $("#app").innerHTML = `<div class="loading">The match data could not be loaded. If you opened this file directly from disk, serve the folder (for example with <code>python3 -m http.server</code>) or open the hosted page.</div>`; return; }
+  const h = (location.hash || "").slice(1); if (["recap", "replay", "ask", "trust"].includes(h)) S.tab = h;
+  prep(); shell();
+}
+boot();
+</script>
+</body></html>

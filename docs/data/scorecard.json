@@ -1,0 +1,35 @@
+{
+ "source": "measured",
+ "model": "gpt-5-mini",
+ "matches": 6,
+ "planted_errors": 392,
+ "caught": 387,
+ "true_sentences": 120,
+ "wrongly_blocked": 0,
+ "by_kind": {
+  "wrong number": [
+   114,
+   114
+  ],
+  "swapped team": [
+   44,
+   44
+  ],
+  "invented cause": [
+   114,
+   114
+  ],
+  "flipped comparison": [
+   6,
+   6
+  ],
+  "wrong citation": [
+   109,
+   114
+  ]
+ },
+ "recap_first_pass": {
+  "drafted": 18,
+  "blocked": 1
+ }
+}
