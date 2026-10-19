@@ -26,6 +26,13 @@ def verify(claim, m):
         xs = lambda sd: sum(e["xg"] for e in ev if e["type"] == "shot" and e["side"] == sd and lo <= e["minute"] < hi)
         poss = possession(ev, side, lo, hi)
         return abs(poss - p["possession"]) <= 1 and abs((xs(side) - xs(other)) - p["xg_diff"]) <= 0.05, f"touches {poss}%"
+    if k == "score_after":
+        e = next((x for x in ev if x["id"] == p["event_id"]), None)
+        ok = bool(e) and e["type"] == "goal" and (e["score_home"], e["score_away"]) == (p["home"], p["away"])
+        return ok, f'event #{p["event_id"]}: score {e["score_home"]}-{e["score_away"]}' if e else "no such event"
+    if k == "why":
+        w = why_result(m); ok = bool(w) and p["reason"] in [r["text"] for r in w["reasons"]]
+        return ok, "recomputed from event log"
     if k == "margin":
         h, a = team_stat(ev, "home", "goals"), team_stat(ev, "away", "goals")
         return (h - a) == p["diff"], f"goal difference {h - a}"
@@ -44,6 +51,14 @@ def analyst(m):
         if k["kind"] == "spell":
             add("spell", f'From minute {k["minute"]+1} to {k["to"]} {k["team"]} had {k["possession"]:.0f}% of the touches and led the chances by {k["xg_diff"]} expected goals',
                 side=k["side"], lo=k["minute"], hi=k["to"], possession=k["possession"], xg_diff=k["xg_diff"]); break
+    for k in key_moments(m):
+        if k["kind"] == "goal":
+            hh, aa = map(int, k["score"].split("-"))
+            add("score_after", f'After {k["player"]}\'s goal for {k["team"]} in minute {k["minute"]+1} it was {hh}-{aa} ({meta["home"]} {hh}, {meta["away"]} {aa})',
+                event_id=k["event_ids"][0], home=hh, away=aa)
+    w = why_result(m)
+    for r in (w or {}).get("reasons", []):
+        add("why", r["text"], reason=r["text"])
     rt = ratings(m)
     if rt:
         top = max(rt.items(), key=lambda kv: kv[1]["rating"]); pid, r = top
@@ -64,6 +79,10 @@ def checker(m, sentence, facts_by_id):
     cited_text = " ".join(facts_by_id[i]["text"] for i in ids)
     for e in ents:
         if e in sentence["text"] and e not in cited_text: return False, f"{e} is not in the cited facts", []
+    for tm in (meta["home"], meta["away"]):
+        first = tm.split()[0]
+        if re.search(rf"\b{re.escape(first)}\b(?!\s+{re.escape(tm.split()[1])})", sentence["text"]):
+            return False, f"shortened team name '{first}' (use '{tm}')", []
     allowed = set().union(*[numbers_in(facts_by_id[i]["text"]) for i in ids])
     stray = [n for n in numbers_in(sentence["text"]) if n not in allowed]
     if stray: return False, f"number(s) {stray} not in cited facts", []
@@ -97,7 +116,7 @@ class MockLLM:
         return None if f is None else {"text": f["text"] + ".", "fact_ids": [f["id"]]}
 
 STYLE = {
- "fan": "Write like a friendly match report for someone who watched casually. Plain words. NEVER say 'expected goals' or 'xG' on its own: say 'the quality of chances' and explain in a few words. Tell the story: who scored when, who had the better of it, and why the result came out as it did. Max 6 short sentences.",
+ "fan": "Write like a friendly match report for someone who watched casually. Plain words. NEVER say 'expected goals' or 'xG' on its own: say 'the quality of chances' and explain in a few words. Tell the story: who scored when, who had the better of it, and why the result came out as it did. Max 7 short sentences.",
  "analyst": "Write for a stats-literate reader. Use the numbers, expected goals (xG), touches share and the 'why' facts. Precise and compact, no filler. Max 7 sentences.",
  "coach": "Write for a coach: what changed, why it mattered, what to take away. Focus on spells, finishing, goalkeeper impact and turning points. No stat dumps. Max 6 sentences."}
 
@@ -106,14 +125,14 @@ class AzureLLM:
         from openai import AzureOpenAI
         self.c = AzureOpenAI(azure_endpoint=endpoint, api_key=key, api_version="2025-04-01-preview"); self.d = deployment
     def _chat(self, system, user):
-        kw = dict(model=self.d, max_completion_tokens=3000, response_format={"type": "json_object"},
+        kw = dict(model=self.d, max_completion_tokens=6000, response_format={"type": "json_object"},
                   messages=[{"role": "system", "content": system}, {"role": "user", "content": user}])
         try: r = self.c.chat.completions.create(reasoning_effort="low", **kw)
         except Exception: r = self.c.chat.completions.create(**kw)
         return json.loads(r.choices[0].message.content)
     def write(self, facts, audience, lang):
         sys = ("You are the Storyteller of a verified football match desk. Use ONLY the facts given. Every sentence must cite the fact ids it uses. "
-               "Never add a number, name, minute, or comparison that the cited facts do not state. Do not use interpretive words such as 'dominated', 'deserved', 'early', "
+               "Structure: (1) result, (2) the turning points using the score_after facts, (3) the reason the result came out that way using the 'why' facts, (4) one standout player. Always use full team names, never shortened. Never add a number, name, minute, or comparison that the cited facts do not state. Do not use interpretive words such as 'dominated', 'deserved', 'early', "
                "'better', 'more' unless a cited fact states the comparison with numbers. Prefer plain description over interpretation. "
                f"Style: {STYLE[audience]} Language: {lang}. "
                'Return JSON: {"headline":"...","sentences":[{"text":"...","fact_ids":[1,2]}]}')
@@ -130,6 +149,13 @@ class AzureLLM:
                'Return JSON: {"sentence": {"text":"...","fact_ids":[...]} or null}')
         allowed = [{"id": i, "text": facts_by_id[i]["text"]} for i in sentence["fact_ids"] if i in facts_by_id]
         return self._chat(sys, json.dumps({"bad": sentence["text"], "reason": reason, "allowed_facts": allowed}, ensure_ascii=False))["sentence"]
+
+def det_headline(m):
+    """Headline is built from the log, not written by the model, so it cannot be wrong."""
+    me = m["meta"]; h, a = me["final_score"]["home"], me["final_score"]["away"]
+    if h == a: return f'{me["home"]} {h}-{a} {me["away"]}: honours even'
+    w, l = (me["home"], me["away"]) if h > a else (me["away"], me["home"])
+    return f'{w} beat {l} {max(h,a)}-{min(h,a)}'
 
 # ---------------- orchestration ----------------
 def pipeline(m, llm, audience="fan", lang="English", max_fix=1):
@@ -158,7 +184,7 @@ def pipeline(m, llm, audience="fan", lang="English", max_fix=1):
             if not ok: st["dropped"] += 1; trace.append({"agent": "Editor", "event": "dropped unsupported sentence"}); continue
         final.append({"text": s["text"], "fact_ids": s["fact_ids"], "status": "verified", "receipts": rec, "_mutated": s.get("_mutated", False)})
     st["blocked_first_pass"] = st["blocked_by_rules"] + st["blocked_by_judge"]
-    return {"audience": audience, "language": lang, "headline": headline, "sentences": final, "trace": trace, "stats": st,
+    return {"audience": audience, "language": lang, "headline": det_headline(m), "sentences": final, "trace": trace, "stats": st,
             "why": (case["why"] or {}).get("headline")}
 
 def evaluate(n=30, err=0.25):
@@ -169,6 +195,57 @@ def evaluate(n=30, err=0.25):
         t["drafted"] += st["drafted"]; t["blocked"] += st["blocked_first_pass"]; t["fixed"] += st["fixed"]; t["dropped"] += st["dropped"]
         t["shown"] += len(out["sentences"]); t["wrong_shown"] += sum(1 for x in out["sentences"] if x["_mutated"])
     t["first_pass_error_rate_%"] = round(100 * t["blocked"] / t["drafted"], 1); return t
+
+def real_scorecard(llm, n_matches=8, seed0=100, verbose=True):
+    """Plants known errors into sentences and measures how many the checker (rules + judge) catches.
+    Also measures false blocks on sentences that are true by construction."""
+    from simulate import simulate
+    rng = random.Random(7); rows = []   # (kind, is_error, blocked, text)
+    for sd in range(seed0, seed0 + n_matches):
+        m = simulate(sd); case = analyst(m); facts = case["facts"]; fb = {f["id"]: f for f in facts}; me = m["meta"]
+        cands = []   # (kind, is_error, text, ids)
+        for f in facts:
+            t = f["text"] + "."
+            cands.append(("true_fact", False, t, [f["id"]]))
+            nums = re.findall(r"\d+(?:\.\d+)?", f["text"])
+            if nums:
+                n = rng.choice(nums); bad = t.replace(n, str(round(float(n) + rng.choice([-2, -1, 1, 3]), 2)), 1)
+                cands.append(("wrong_number", True, bad, [f["id"]]))
+            if me["home"] in f["text"] and me["away"] not in f["text"]:
+                cands.append(("wrong_team", True, t.replace(me["home"], me["away"]), [f["id"]]))
+            cands.append(("invented_cause", True, t[:-1] + " because they pressed much higher up the pitch.", [f["id"]]))
+            other = rng.choice([g for g in facts if g["id"] != f["id"]])
+            cands.append(("wrong_citation", True, t, [other["id"]]))
+        hs, as_ = team_stat(m["events"], "home", "shots"), team_stat(m["events"], "away", "shots")
+        ids = {c["kind"] + c["params"].get("side", ""): f["id"] for f in facts for c in [f["claim"]] if c["kind"] == "team_stat" and c["params"].get("stat") == "shots"}
+        sh = [f for f in facts if f["claim"]["kind"] == "team_stat" and f["claim"]["params"].get("stat") == "shots"]
+        if len(sh) == 2 and hs != as_:
+            more, less = (me["home"], me["away"]) if hs > as_ else (me["away"], me["home"])
+            cids = [f["id"] for f in sh]
+            cands.append(("true_comparison", False, f"{more} had more shots than {less}.", cids))
+            cands.append(("flipped_comparison", True, f"{less} had more shots than {more}.", cids))
+        # rules first, then judge on whatever the rules let through
+        items, idx = [], []
+        res = []
+        for kind, err, text, ids_ in cands:
+            ok, why, _ = checker(m, {"text": text, "fact_ids": ids_}, fb)
+            res.append([kind, err, not ok, text])
+            if ok: idx.append(len(res) - 1); items.append({"i": len(items), "sentence": text, "cited_facts": [fb[x]["text"] for x in ids_]})
+        for a in range(0, len(items), 20):
+            chunk = items[a:a + 20]
+            for it, j in zip(chunk, llm.judge([dict(x, i=k) for k, x in enumerate(chunk)])):
+                res[idx[it["i"]]][2] = not j
+        rows += res
+        if verbose: print(f"match {sd}: {len(cands)} test sentences done")
+    out = {}
+    for kind in sorted({r[0] for r in rows}):
+        sub = [r for r in rows if r[0] == kind]; out[kind] = (sum(r[2] for r in sub), len(sub))
+    errs = [r for r in rows if r[1]]; trues = [r for r in rows if not r[1]]
+    summary = {"planted_errors": len(errs), "caught": sum(r[2] for r in errs), "catch_rate_%": round(100 * sum(r[2] for r in errs) / len(errs), 1),
+               "true_sentences": len(trues), "wrongly_blocked": sum(r[2] for r in trues), "false_block_rate_%": round(100 * sum(r[2] for r in trues) / len(trues), 1),
+               "by_kind(blocked,total)": out,
+               "missed_examples": [r[3] for r in errs if not r[2]][:8]}
+    return summary
 
 if __name__ == "__main__":
     from simulate import simulate
