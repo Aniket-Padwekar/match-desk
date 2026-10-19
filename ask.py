@@ -48,7 +48,11 @@ def run_tool(m, tool, args):
         return {"text": "Goals: " + "; ".join(f'{e["player"]} for {side_name(e["side"])} in minute {e["minute"]+1} ({e["score_home"]}-{e["score_away"]})' for e in gs) + ".",
                 "receipts": [e["id"] for e in gs]}
     if tool == "team_stat":
-        side, stat = args.get("side"), args.get("stat"); lo, hi = args.get("from_min"), args.get("to_min")
+        side, stat = args.get("side"), args.get("stat")
+        def _n(v):
+            try: return int(float(v))
+            except (TypeError, ValueError): return None
+        lo, hi = _n(args.get("from_min")), _n(args.get("to_min"))
         if side not in ("home", "away") or stat not in STATS: return None
         hits = [e for e in ev if e["side"] == side and e["type"] in STATS[stat] and _window(e, lo, hi)]
         win = f' between minute {lo} and {hi}' if lo and hi else ""

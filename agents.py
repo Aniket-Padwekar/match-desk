@@ -169,9 +169,18 @@ class AzureLLM:
         sys = ("You are a strict football fact judge. For each item, decide whether the sentence is FULLY supported by its cited facts: "
                "every claim, comparison (more/less/better), time word (early/late) and implied cause must be stated or directly follow from the facts. "
                'Return JSON: {"verdicts":[{"i":0,"supported":true,"problem":""}]}')
-        r = self._chat(sys, json.dumps(items, ensure_ascii=False))["verdicts"]
-        by = {v["i"]: v["supported"] for v in r}; self.last_problems = {v["i"]: v.get("problem", "") for v in r}
-        return [bool(by.get(i, False)) for i in range(len(items))]
+        r = None
+        for _ in range(2):   # retry once if the reply is not valid JSON
+            try: r = self._chat(sys, json.dumps(items, ensure_ascii=False))["verdicts"]; break
+            except Exception: r = None
+        self.last_problems = {}
+        if not r: return [False] * len(items)          # fail closed: if the judge cannot answer, nothing is approved
+        by = {}
+        for pos, v in enumerate(r):                     # accept 'i' or 'index'; fall back to the order of the reply
+            try: idx = int(v.get("i", v.get("index", pos)))
+            except (TypeError, ValueError): idx = pos
+            by[idx] = bool(v.get("supported", v.get("ok", False))); self.last_problems[idx] = v.get("problem", "")
+        return [by.get(i, False) for i in range(len(items))]
     def fix(self, sentence, facts_by_id, reason):
         sys = ("Rewrite ONE sentence so it is fully supported by the allowed facts using only plain description, or return null if it cannot be. "
                'Return JSON: {"sentence": {"text":"...","fact_ids":[...]} or null}')
