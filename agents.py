@@ -148,12 +148,12 @@ class AzureLLM:
         from ask import TOOL_SPECS
         me = m["meta"]
         sys = ("You turn a football question about ONE match into tool calls. " + TOOL_SPECS + f" The match is {me['home']} (home) vs {me['away']} (away). "
-               'Return JSON: {"calls":[{"tool":"...","args":{...}}]} or {"unanswerable":"..."}. At most 3 calls.')
+               'Return JSON: {"calls":[{"tool":"...","args":{...}}]} or {"unanswerable":"<short phrase, max 15 words, what is missing; never ask a question back>"}. At most 3 calls. Use the tools even if the question says "home team" or "away team".')
         r = self._chat(sys, question)
         return r["calls"] if r.get("calls") else {"unanswerable": r.get("unanswerable") or "no tool fits"}
     def answer_write(self, question, facts, audience, lang):
         sys = ("You answer a football question using ONLY the facts given. Cite the fact ids used in every sentence. Never add a number, name or comparison that the facts do not state; "
-               "no causes or opinions unless a fact states them. If the facts do not answer the question, say so instead of guessing. "
+               "no causes or opinions unless a fact states them. Answer only what was asked; do NOT add sentences about what the facts leave out. "
                f"Style: {STYLE[audience]} Language: {lang}. Answer in 1-3 short sentences. "
                'Return JSON: {"sentences":[{"text":"...","fact_ids":[1]}]}')
         return self._chat(sys, json.dumps({"question": question, "facts": [{"id": f["id"], "text": f["text"]} for f in facts]}, ensure_ascii=False))
@@ -273,7 +273,7 @@ if __name__ == "__main__":
     for f in case["facts"][-4:]: print(f["id"], f["text"], verify(f["claim"], m))
     # regression: the exact false sentence the real model produced in the first run
     fb = {f["id"]: f for f in case["facts"]}
-    bad = {"text": "Rhein Rangers hatten deutlich mehr Ballbesitz mit 47% der Ballkontakte.", "fact_ids": [13]}
+    bad = {"text": f'{m["meta"]["home"]} hatten deutlich mehr Ballbesitz mit 47% der Ballkontakte.', "fact_ids": [13]}
     print("false-possession test ->", checker(m, bad, fb)[:2])
     bad2 = {"text": "Der Torwart machte fünf Paraden.", "fact_ids": [8]}
     print("spelled-number test ->", checker(m, bad2, fb)[:2])

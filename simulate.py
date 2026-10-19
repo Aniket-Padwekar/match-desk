@@ -7,8 +7,9 @@ Everything is invented: no real match data is used.
 import json, math, random, sys
 
 POS = ["GK","RB","CB","CB","LB","DM","CM","CM","RW","ST","LW"]
-FIRST = ["Luca","Jonas","Mateo","Noah","Elias","Tariq","Kofi","Anton","Felix","Rafael","Idris","Milan","Theo","Oskar","Yusuf","Marco","Leon","Nico","Sami","Emre","Viktor","Jamal","Paulo","Ivan","Finn"]
-LAST = ["Brandt","Okafor","Moreau","Lindqvist","Duarte","Kovac","Haddad","Weber","Santos","Nakamura","Petrov","Alvarez","Berg","Diallo","Romano","Keller","Mensah","Novak","Ruiz","Strand","Vogel","Costa","Aydin","Lang","Mertens"]
+FIRST = ["Jack","Harry","Ollie","Reece","Callum","Tyler","Mateo","Noah","Elias","Tariq","Kofi","Felix","Rafael","Idris","Milan","Theo","Oskar","Yusuf","Marco","Leon","Nico","Sami","Jamal","Paulo","Finn","Dan","Kieran","Amari","Joe","Luca"]
+LAST = ["Hartley","Pemberton","Ashworth","Whitlock","Fairbrother","Quigley","Thorne","Okafor","Moreau","Lindqvist","Duarte","Kovac","Haddad","Santos","Nakamura","Petrov","Alvarez","Diallo","Romano","Mensah","Novak","Ruiz","Costa","Aydin","Mertens","Calloway","Sutcliffe","Brennan","Ogunbanjo","Pryce"]
+CLUBS = ["Harbourside City","Northgate Rovers","Redbridge Town","Westmere Athletic","Kingsway United","Thornbury Wanderers","Ironbridge Town","Calder Valley","Eastfield Rovers","Stonebridge City","Larkhill Athletic","Brightwater Town","Oakhaven Rangers","Fenwick Park","Saltmarsh United","Wexcombe City","Pennine Rovers","Hollowdene","Greyfriars Town","Redcliffe Athletic"]  # fictional clubs; any resemblance to real clubs or people is coincidental
 
 def make_team(rng, name, strength):
     used=set(); players=[]
@@ -36,7 +37,8 @@ def xg_model(x,y):
     z=-1.0-0.17*d+1.9*ang+0.35
     return round(1/(1+math.exp(-z)),3)
 
-def simulate(seed, home="Rhein Rangers", away="Nordstadt United", hs=None, as_=None):
+def simulate(seed, home=None, away=None, hs=None, as_=None):
+    _r = random.Random(seed * 7919 + 13); _c = _r.sample(CLUBS, 2); home, away = home or _c[0], away or _c[1]
     rng=random.Random(seed)
     hs=hs if hs is not None else rng.gauss(1.0,0.08)
     as_=as_ if as_ is not None else rng.gauss(1.0,0.08)

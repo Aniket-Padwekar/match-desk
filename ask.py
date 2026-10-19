@@ -15,10 +15,11 @@ TOOL_SPECS = """Tools (call with JSON):
 - team_stat(side, stat, from_min, to_min) : side is 'home' or 'away'; stat is one of %s; from_min/to_min optional (match minutes 1-90+)
 - player_stat(player, stat) : counts for one named player (full or last name); stat one of %s, or 'xg'
 - top_players(stat, n) : the n players with the most of a stat (both teams)
+- top_rated(n) : the n highest-rated players in the match, with why the best one scored so well
 - rating(player) : the published rating formula applied to one player, with the biggest contributors
 - why_result() : the reasons the result did or did not match the chances
 - lineup_info(team) : players and positions of a team
-If the question needs something the event log does not contain (tactics, instructions, injuries, fitness, intentions, opinions, players' speed or distance, anything about other matches or real teams), answer {"unanswerable": "<what is missing>"}.""" % (list(STATS), list(STATS))
+If the question needs something the event log does not contain (formation, tactics, instructions, injuries, fitness, intentions, opinions, players' speed or distance, anything about other matches or real teams), answer {"unanswerable": "<what is missing>"}.""" % (list(STATS), list(STATS))
 
 def _players(m):
     out = []
@@ -38,6 +39,7 @@ def run_tool(m, tool, args):
     """Returns {"text": str, "receipts": [event ids]} or None if the tool cannot answer."""
     ev, me = m["events"], m["meta"]; args = args or {}
     side_name = lambda s: me["home"] if s == "home" else me["away"]
+    lab = lambda s: f'{side_name(s)} ({s} team)'
     if tool == "score_timeline":
         gs = [e for e in ev if e["type"] == "goal"]
         if not gs: return {"text": "No goals were scored.", "receipts": []}
@@ -48,7 +50,7 @@ def run_tool(m, tool, args):
         if side not in ("home", "away") or stat not in STATS: return None
         hits = [e for e in ev if e["side"] == side and e["type"] in STATS[stat] and _window(e, lo, hi)]
         win = f' between minute {lo} and {hi}' if lo and hi else ""
-        return {"text": f'{side_name(side)} had {len(hits)} {stat}{win}.', "receipts": [e["id"] for e in hits][:15]}
+        return {"text": f'{lab(side)} had {len(hits)} {stat}{win}.', "receipts": [e["id"] for e in hits][:15]}
     if tool == "player_stat":
         hit = _find(m, args.get("player", ""))
         if not hit: return None
@@ -68,7 +70,14 @@ def run_tool(m, tool, args):
         if not c: return {"text": f"Nobody recorded any {stat}.", "receipts": []}
         top = sorted(c.items(), key=lambda kv: (-kv[1], kv[0]))
         cut = top[min(n, len(top)) - 1][1]; top = [t for t in top if t[1] >= cut][:max(n, 1)]
-        return {"text": f'Most {stat}: ' + ", ".join(f"{p} {k}" for p, k in top) + ".", "receipts": []}
+        lead = {p for p, _ in top}
+        return {"text": f'Most {stat}: ' + ", ".join(f"{p} {k}" for p, k in top) + ".",
+                "receipts": [e["id"] for e in ev if e["type"] in STATS[stat] and e.get("player") in lead][:15]}
+    if tool == "top_rated":
+        R = ratings(m); n = int(args.get("n", 3) or 3)
+        best = sorted(R.items(), key=lambda kv: -kv[1]["rating"])[:max(n, 1)]
+        pid, r0 = best[0]; ex = explain_rating(m, pid)
+        return {"text": "Highest rated: " + ", ".join(f'{r["player"]} {r["rating"]}' for _, r in best) + ". " + ex["text"], "receipts": ex["receipts"]}
     if tool == "rating":
         hit = _find(m, args.get("player", ""))
         if len(hit) != 1: return None
@@ -91,6 +100,7 @@ class MockPlanner:
     """Keyword planner used offline so the pipeline can be tested without Azure."""
     def plan(self, m, q):
         ql = q.lower(); me = m["meta"]
+        if "rated" in ql or "rating" in ql or "best player" in ql: return [{"tool": "top_rated", "args": {"n": 3}}]
         if any(w in ql for w in ["why", "deserve", "unlucky", "lucky"]): return [{"tool": "why_result", "args": {}}]
         if any(w in ql for w in ["injur", "tired", "fatigue", "tactic", "formation", "manager", "coach", "instruct", "speed", "km", "feel", "best player in the league", "last season", "transfer"]):
             return {"unanswerable": "this is not recorded in the event log"}
@@ -120,7 +130,7 @@ def answer(m, question, llm, audience="fan", lang="English"):
     plan = llm.plan(m, question)
     if isinstance(plan, dict):
         trace.append({"agent": "Planner", "event": "unanswerable: " + plan["unanswerable"]})
-        return {"question": question, "status": "cannot_tell", "answer": CANNOT + plan["unanswerable"] + ".", "sentences": [], "trace": trace}
+        return {"question": question, "status": "cannot_tell", "answer": CANNOT + plan["unanswerable"].strip().rstrip(".") + ".", "sentences": [], "trace": trace}
     facts = facts_for(m, plan); fb = {f["id"]: f for f in facts}
     trace.append({"agent": "Planner", "event": "calls: " + ", ".join(c.get("tool", "?") for c in plan)})
     if not facts:
@@ -132,6 +142,7 @@ def answer(m, question, llm, audience="fan", lang="English"):
     out = []
     for i, s in enumerate(w):
         ok, why, _ = checker(m, s, fb)
+        if ok and re.search(r"\bthe (provided )?facts\b.*\b(do not|don't|does not|doesn't|not state|only)\b", s["text"].lower()): ok, why = False, "filler about the facts"
         if ok and judged[i]:
             rec = sorted({r for x in s["fact_ids"] for r in fb[x]["receipts"]})
             out.append({"text": s["text"], "fact_ids": s["fact_ids"], "receipts": rec})
