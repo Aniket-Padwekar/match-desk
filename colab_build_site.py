@@ -1,10 +1,11 @@
 # Colab cell: builds ALL the real website data (recaps, answers, scorecard) with your Azure model. Takes about 20-25 minutes.
 # Paste into one Colab cell and press play. It asks for 3 values (the key stays hidden).
 !pip -q install openai
+!pip -q install --pre agent-framework
 !rm -rf match-desk && git clone -q https://github.com/Aniket-Padwekar/match-desk.git
 import sys, re, json, time
 sys.path.insert(0, "match-desk")
-for _m in ["agents","engine","insight","simulate","ask"]: sys.modules.pop(_m, None)   # forget old copies from earlier runs
+for _m in ["agents","engine","insight","simulate","ask","maf_workflow"]: sys.modules.pop(_m, None)   # forget old copies from earlier runs
 print("GitHub agents.py has the Judge:", "def judge" in open("match-desk/agents.py").read())
 from getpass import getpass
 from simulate import simulate
@@ -21,6 +22,13 @@ m_ = re.match(r"(https://[^/]+)", endpoint); endpoint = (m_.group(1) + "/") if m
 deployment = input("Deployment name (gpt-5-mini): ").strip() or "gpt-5-mini"
 key = getpass("API key (hidden): ").strip()
 llm = AzureLLM(endpoint, key, deployment)
+try:
+    import maf_workflow
+    run_recap = lambda m_, aud, lang: maf_workflow.run(m_, llm, audience=aud, lang=lang)
+    print("Orchestration: Microsoft Agent Framework workflow")
+except Exception as e:
+    print("Agent Framework not available, using the plain pipeline:", str(e)[:200])
+    run_recap = lambda m_, aud, lang: pipeline(m_, llm, audience=aud, lang=lang)
 
 
 SEEDS = [1, 4, 5, 12, 18, 20, 23, 32]
@@ -30,7 +38,7 @@ for n, seed in enumerate(SEEDS, 1):
     m = simulate(seed); mid = m["meta"]["match_id"]; recaps[mid] = {}; ask[mid] = []
     print(f"\n[{n}/{len(SEEDS)}] {m['meta']['home']} {m['meta']['final_score']['home']}-{m['meta']['final_score']['away']} {m['meta']['away']}")
     for aud, lang in RECAPS:
-        try: out = pipeline(m, llm, audience=aud, lang=lang)
+        try: out = run_recap(m, aud, lang)
         except Exception as e: print("  recap FAILED", aud, str(e)[:150]); continue
         for s in out["sentences"]: s.pop("_mutated", None)
         recaps[mid][f"{aud}:{lang}"] = {k: out[k] for k in ("headline", "sentences", "trace", "stats")}

@@ -110,6 +110,7 @@ def checker(m, sentence, facts_by_id, audience=None):
         if e in sentence["text"] and e not in cited_text: return False, f"{e} is not in the cited facts", []
     for tm in (meta["home"], meta["away"]):
         first = tm.split()[0]
+        if len(tm.split()) < 2: continue   # one-word club names cannot be shortened
         if re.search(rf"\b{re.escape(first)}\b(?!\s+{re.escape(tm.split()[1])})", sentence["text"]):
             return False, f"shortened team name '{first}' (use '{tm}')", []
     allowed = set().union(*[numbers_in(facts_by_id[i]["text"]) for i in ids])
@@ -135,7 +136,10 @@ class MockLLM:
                 mutated = True; nums = re.findall(r"\d+(?:\.\d+)?", text)
                 if nums and self.rng.random() < 0.7:
                     n = self.rng.choice(nums); text = text.replace(n, str(round(float(n) + self.rng.choice([-3, -1, 2, 5]), 2)), 1)
-                else: ids = [self.rng.choice([g for g in facts if g["id"] != f["id"]])["id"]]
+                else:   # cite a fact that really does not support the sentence (no shared numbers or opening words)
+                    own = set(re.findall(r"\d+(?:\.\d+)?", text)); head = " ".join(text.split()[:2])
+                    pool = [g for g in facts if g["id"] != f["id"] and not (own & set(re.findall(r"\d+(?:\.\d+)?", g["text"]))) and head not in g["text"]]
+                    ids = [self.rng.choice(pool or [g for g in facts if g["id"] != f["id"]])["id"]]
             out.append({"text": text + ".", "fact_ids": ids, "_mutated": mutated})
         return {"headline": "", "sentences": out}
     def plan(self, m, q):
@@ -215,34 +219,62 @@ def det_headline(m):
     return f'{w} beat {l} {max(h,a)}-{min(h,a)}'
 
 # ---------------- orchestration ----------------
-def pipeline(m, llm, audience="fan", lang="English", max_fix=1):
-    case = analyst(m); facts = case["facts"]; fb = {f["id"]: f for f in facts}
-    trace = [{"agent": "StatsAnalyst", "event": f'{len(facts)} facts built from the event log'}]
-    w = llm.write([{"id": f["id"], "text": f["text"]} for f in facts], audience, lang)
-    draft, headline = w["sentences"], w.get("headline", "")
-    trace.append({"agent": "Storyteller", "event": f"drafted {len(draft)} sentences"})
-    rules = [checker(m, s, fb, audience) for s in draft]
-    jitems = [{"i": i, "sentence": s["text"], "cited_facts": [fb[x]["text"] for x in s["fact_ids"] if x in fb]} for i, s in enumerate(draft)]
-    judged = llm.judge(jitems) if jitems else []
-    final, st = [], dict(drafted=len(draft), blocked_by_rules=0, blocked_by_judge=0, fixed=0, dropped=0)
+# ---------------- the five stages (used by pipeline() and by the Microsoft Agent Framework workflow) ----------------
+def stage_analyst(st):
+    """StatsAnalyst: builds the checkable facts from the raw event log."""
+    case = analyst(st["m"]); facts = case["facts"]
+    st.update(case=case, facts=facts, fb={f["id"]: f for f in facts},
+              trace=[{"agent": "StatsAnalyst", "event": f"{len(facts)} facts built from the event log"}])
+    return st
+
+def stage_storyteller(st):
+    """Storyteller: the language model drafts sentences that cite fact ids."""
+    w = st["llm"].write([{"id": f["id"], "text": f["text"]} for f in st["facts"]], st["audience"], st["lang"])
+    st["draft"] = w["sentences"]
+    st["trace"].append({"agent": "Storyteller", "event": f"drafted {len(st['draft'])} sentences"})
+    return st
+
+def stage_factchecker(st):
+    """FactChecker: deterministic rules re-derive every claim from the event log."""
+    st["rules"] = [checker(st["m"], s, st["fb"], st["audience"]) for s in st["draft"]]
+    return st
+
+def stage_judge(st):
+    """Judge: a second model call checks meaning (causes, comparisons) that rules cannot."""
+    fb = st["fb"]
+    items = [{"i": i, "sentence": s["text"], "cited_facts": [fb[x]["text"] for x in s["fact_ids"] if x in fb]} for i, s in enumerate(st["draft"])]
+    st["judged"] = st["llm"].judge(items) if items else []
+    return st
+
+def stage_editor(st):
+    """Editor: rewrites a blocked sentence (and re-checks it) or drops it. Returns the finished recap."""
+    m, llm, fb, draft, rules, judged, trace = st["m"], st["llm"], st["fb"], st["draft"], st["rules"], st["judged"], st["trace"]
+    final, ct = [], dict(drafted=len(draft), blocked_by_rules=0, blocked_by_judge=0, fixed=0, dropped=0)
     for i, s in enumerate(draft):
         ok, reason, rec = rules[i]
         if ok and not judged[i]:
-            ok, reason = False, "judge: " + (getattr(llm, "last_problems", {}).get(i) or "not fully supported by cited facts"); st["blocked_by_judge"] += 1
-        elif not ok: st["blocked_by_rules"] += 1
+            ok, reason = False, "judge: " + (getattr(llm, "last_problems", {}).get(i) or "not fully supported by cited facts"); ct["blocked_by_judge"] += 1
+        elif not ok: ct["blocked_by_rules"] += 1
         if not ok:
             trace.append({"agent": "Judge" if reason.startswith("judge") else "FactChecker", "event": f"blocked: {reason}"})
-            for _ in range(max_fix):
+            for _ in range(st.get("max_fix", 1)):
                 s2 = llm.fix(s, fb, reason)
                 if s2:
-                    ok2, r2, rec2 = checker(m, s2, fb, audience)
+                    ok2, r2, rec2 = checker(m, s2, fb, st["audience"])
                     j2 = llm.judge([{"i": 0, "sentence": s2["text"], "cited_facts": [fb[x]["text"] for x in s2["fact_ids"] if x in fb]}])[0] if ok2 else False
-                    if ok2 and j2: s2["_mutated"] = False; s, ok, rec = s2, True, rec2; st["fixed"] += 1; trace.append({"agent": "Editor", "event": "rewrote sentence; re-check passed"}); break
-            if not ok: st["dropped"] += 1; trace.append({"agent": "Editor", "event": "dropped unsupported sentence"}); continue
+                    if ok2 and j2: s2["_mutated"] = False; s, ok, rec = s2, True, rec2; ct["fixed"] += 1; trace.append({"agent": "Editor", "event": "rewrote sentence; re-check passed"}); break
+            if not ok: ct["dropped"] += 1; trace.append({"agent": "Editor", "event": "dropped unsupported sentence"}); continue
         final.append({"text": s["text"], "fact_ids": s["fact_ids"], "status": "verified", "receipts": rec, "_mutated": s.get("_mutated", False)})
-    st["blocked_first_pass"] = st["blocked_by_rules"] + st["blocked_by_judge"]
-    return {"audience": audience, "language": lang, "headline": det_headline(m), "sentences": final, "trace": trace, "stats": st,
-            "why": (case["why"] or {}).get("headline")}
+    ct["blocked_first_pass"] = ct["blocked_by_rules"] + ct["blocked_by_judge"]
+    return {"audience": st["audience"], "language": st["lang"], "headline": det_headline(m), "sentences": final, "trace": trace, "stats": ct,
+            "why": (st["case"]["why"] or {}).get("headline")}
+
+STAGES = [stage_analyst, stage_storyteller, stage_factchecker, stage_judge, stage_editor]
+
+def pipeline(m, llm, audience="fan", lang="English", max_fix=1):
+    st = {"m": m, "llm": llm, "audience": audience, "lang": lang, "max_fix": max_fix}
+    for stage in STAGES[:-1]: st = stage(st)
+    return stage_editor(st)
 
 def evaluate(n=30, err=0.25):
     from simulate import simulate
