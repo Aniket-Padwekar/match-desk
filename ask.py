@@ -158,7 +158,8 @@ def answer(m, question, llm, audience="fan", lang="English"):
         trace.append({"agent": "Tools", "event": "no tool could answer"})
         return {"question": question, "status": "cannot_tell", "answer": CANNOT + "none of the available lookups can answer it from this event log.", "sentences": [], "trace": trace}
     raw = llm.answer_write(question, facts, audience, lang)
-    if raw.get("answers_question") is False:
+    only_inj = all(c.get("tool") == "injuries" for c in plan)   # a "none recorded" result is itself the answer
+    if raw.get("answers_question") is False and not only_inj:
         trace.append({"agent": "Storyteller", "event": "the lookups do not answer what was asked"})
         return {"question": question, "status": "cannot_tell", "answer": CANNOT + "none of the available lookups covers what was asked.", "sentences": [], "trace": trace}
     w = raw["sentences"]
