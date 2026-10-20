@@ -1,9 +1,9 @@
 """Tiny stand-in for the agent_framework package, only to test the wiring offline (the real package is used in Colab/CI)."""
-import sys, types, asyncio
+import sys, types, asyncio, copy
 class WorkflowContext:
     def __class_getitem__(cls, item): return cls
     def __init__(self, out, outputs): self._o, self._out = out, outputs
-    async def send_message(self, msg): self._o.append(msg)
+    async def send_message(self, msg): self._o.append(copy.deepcopy(msg))   # like the real framework: messages are copied
     async def yield_output(self, v): self._out.append(v)
 class _Ex:
     def __init__(self, fn, id): self.fn, self.id = fn, id
