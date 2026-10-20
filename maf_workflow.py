@@ -9,27 +9,36 @@ from typing_extensions import Never
 from agent_framework import WorkflowBuilder, WorkflowContext, executor
 from agents import stage_analyst, stage_storyteller, stage_factchecker, stage_judge, stage_editor
 
-@executor(id="StatsAnalyst")
-async def stats_analyst(state: dict, ctx: WorkflowContext[dict]) -> None:
-    await ctx.send_message(stage_analyst(state))
+def build_workflow(llm):
+    """The model connection lives in the executors (a closure), never in the messages: the framework copies messages between agents."""
+    def step(stage):
+        def run_stage(state):
+            state["llm"] = llm
+            out = stage(state)
+            out.pop("llm", None)
+            return out
+        return run_stage
 
-@executor(id="Storyteller")
-async def storyteller(state: dict, ctx: WorkflowContext[dict]) -> None:
-    await ctx.send_message(stage_storyteller(state))
+    @executor(id="StatsAnalyst")
+    async def stats_analyst(state: dict, ctx: WorkflowContext[dict]) -> None:
+        await ctx.send_message(step(stage_analyst)(state))
 
-@executor(id="FactChecker")
-async def fact_checker(state: dict, ctx: WorkflowContext[dict]) -> None:
-    await ctx.send_message(stage_factchecker(state))
+    @executor(id="Storyteller")
+    async def storyteller(state: dict, ctx: WorkflowContext[dict]) -> None:
+        await ctx.send_message(step(stage_storyteller)(state))
 
-@executor(id="Judge")
-async def judge(state: dict, ctx: WorkflowContext[dict]) -> None:
-    await ctx.send_message(stage_judge(state))
+    @executor(id="FactChecker")
+    async def fact_checker(state: dict, ctx: WorkflowContext[dict]) -> None:
+        await ctx.send_message(step(stage_factchecker)(state))
 
-@executor(id="Editor")
-async def editor(state: dict, ctx: WorkflowContext[Never, dict]) -> None:
-    await ctx.yield_output(stage_editor(state))
+    @executor(id="Judge")
+    async def judge(state: dict, ctx: WorkflowContext[dict]) -> None:
+        await ctx.send_message(step(stage_judge)(state))
 
-def build_workflow():
+    @executor(id="Editor")
+    async def editor(state: dict, ctx: WorkflowContext[Never, dict]) -> None:
+        await ctx.yield_output(step(stage_editor)(state))
+
     return (WorkflowBuilder(start_executor=stats_analyst, output_from=[editor])
             .add_edge(stats_analyst, storyteller)
             .add_edge(storyteller, fact_checker)
@@ -38,7 +47,7 @@ def build_workflow():
             .build())
 
 async def arun(m, llm, audience="fan", lang="English"):
-    result = await build_workflow().run({"m": m, "llm": llm, "audience": audience, "lang": lang, "max_fix": 1})
+    result = await build_workflow(llm).run({"m": m, "audience": audience, "lang": lang, "max_fix": 1})
     return result.get_outputs()[0]
 
 def run(m, llm, audience="fan", lang="English"):
