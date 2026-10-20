@@ -159,6 +159,10 @@ STYLE = {
  "analyst": "Write for a stats-literate reader. Use the numbers, expected goals (xG), touches share and the 'why' facts. Precise and compact, no filler. Max 7 sentences.",
  "coach": "Write for a coach: what changed, why it mattered, what to take away. Focus on spells, finishing, goalkeeper impact and turning points. No stat dumps. Max 6 sentences."}
 
+def _mock_translate(texts, lang): return [f"[{lang}] " + t for t in texts]
+MockLLM.translate = lambda self, texts, lang: _mock_translate(texts, lang)
+MockLLM.translate_ui = lambda self, texts, lang: _mock_translate(texts, lang)
+
 class AzureLLM:
     def __init__(self, endpoint, key, deployment):
         from openai import AzureOpenAI
@@ -205,6 +209,18 @@ class AzureLLM:
             except (TypeError, ValueError): idx = pos
             by[idx] = bool(v.get("supported", v.get("ok", False))); self.last_problems[idx] = v.get("problem", "")
         return [by.get(i, False) for i in range(len(items))]
+    def translate(self, texts, lang):
+        from translate import ENGLISH_NAME
+        sys = (f"Translate each football sentence into {ENGLISH_NAME.get(lang, lang)}. Rules: write every number as digits (0-9), even if the source spells it out; never add or remove a number; "
+               "keep every person's name and every club name exactly as written in Latin letters, unchanged; keep the meaning exactly and add nothing; keep a neutral, plain tone. "
+               'Return JSON: {"translations":["..."]} with exactly the same number of items in the same order.')
+        return self._chat(sys, json.dumps(texts, ensure_ascii=False))["translations"]
+    def translate_ui(self, texts, lang):
+        from translate import ENGLISH_NAME
+        sys = (f"Translate these short user-interface labels of a football match app into {ENGLISH_NAME.get(lang, lang)}. Keep placeholders like {{player}} or {{n}} exactly as they are. "
+               "Keep labels short; keep numbers as digits. "
+               'Return JSON: {"translations":["..."]} with exactly the same number of items in the same order.')
+        return self._chat(sys, json.dumps(texts, ensure_ascii=False))["translations"]
     def fix(self, sentence, facts_by_id, reason):
         sys = ("Rewrite ONE sentence so it is fully supported by the allowed facts using only plain description, or return null if it cannot be. Fix exactly what the reason says: use full team names, and say 'chance quality' instead of 'expected goals' when the reason mentions jargon. "
                'Return JSON: {"sentence": {"text":"...","fact_ids":[...]} or null}')

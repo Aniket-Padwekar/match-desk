@@ -16,9 +16,9 @@ Recaps, match chats and AI commentary are only useful if people can trust them. 
 
 | Tab | What you get |
 |---|---|
-| **Recap** | A short match report in three voices (fan, analyst, coach). Every sentence links to its receipts. |
+| **Recap** | A short, plain match report. Every sentence is checked against the event log and links to its receipts; select a sentence to see the players and passes behind it on the pitch. |
 | **Replay** | A second-screen timeline of the match: goals, big chances, cards, injuries, substitutions, possession spells, on a pitch. |
-| **Ask the Match** | Ask in plain English ("Who made the most interceptions?", "Was anyone injured?"). Answers are computed from the event log and cited. Questions the data cannot answer (formations that were not recorded, how long a player will be out, whether the referee was right) get a clear "the match data cannot tell us this" and the reason. |
+| **Ask the Match** | Pick one of 11 prepared questions, or type your own and get a live answer (an Azure Function runs the same planner, checks and judge). Ask in plain English ("Who made the most interceptions?", "Was anyone injured?"). Answers are computed from the event log and cited. Questions the data cannot answer (formations that were not recorded, how long a player will be out, whether the referee was right) get a clear "the match data cannot tell us this" and the reason. |
 | **Trust** | A measured scorecard: how many deliberately planted errors the checker caught, and how many true sentences it wrongly blocked. |
 
 ## How it works: five agents in a loop
@@ -35,6 +35,10 @@ StatsAnalyst -> Storyteller -> FactChecker -> Judge -> Editor -> verified recap
 
 **Ask the Match** follows the same idea: a planner chooses from a small set of deterministic lookups (score timeline, team stats, top players, ratings, injuries, substitutions, "why did the result happen"); a writer phrases the result; the same checker and Judge verify it; otherwise the answer is a code-written "cannot tell".
 
+## Season, languages and themes
+
+A fictional 16-club league with 3 matchweeks of 8 matches (24 matches), chosen from a dropdown. The interface and every recap and answer exist in 20 languages (English, German, French, Spanish, Italian, Portuguese, Dutch, Polish, Swedish, Danish, Finnish, Czech, Romanian, Greek, Hungarian, Turkish, Arabic, Hindi, Japanese, Chinese). Translations are made ahead of time from the verified English text, so switching language is instant. Each translated sentence is checked: it must keep the same numbers and every player and club name unchanged, otherwise it falls back to the English sentence. Interface labels are machine-translated and marked as such. Dark theme is the default, with a light option.
+
 ## Microsoft technology used
 
 | Technology | Where |
@@ -42,6 +46,7 @@ StatsAnalyst -> Storyteller -> FactChecker -> Judge -> Editor -> verified recap
 | **Microsoft Foundry** (Azure AI Foundry) | Hosts the `gpt-5-mini` model deployment that the Storyteller, Judge, Editor and Ask planner/writer call. |
 | **Microsoft Agent Framework** (Python) | `maf_workflow.py` runs the five agents as a workflow graph (executors connected by edges). It calls the same stage functions as the plain pipeline, so both give identical results. |
 | **Azure OpenAI in Foundry** (`openai` SDK, `AzureOpenAI` client) | The model calls, with `reasoning_effort="low"` to keep cost down. |
+| **Azure Functions** | `function_app.py` and `live_ask.py` answer typed questions live. The model key lives only in the Function App settings, with a per-visitor limit and a hard total cap. |
 | **GitHub Actions** | `.github/workflows/scorecard.yml` re-runs the verifier checks on every push so the checker cannot quietly get worse. |
 | **GitHub Pages** | Hosts the demo site from `/docs` at no cost. |
 
@@ -92,6 +97,13 @@ insight.py         player ratings and "why did the result happen"
 agents.py          the five stages, checker, model backends, scorecard
 maf_workflow.py    the same five agents as a Microsoft Agent Framework workflow
 ask.py             Ask the Match: lookups, planner, checked answers
+season.py          fictional 16-club league and fixtures
+build_season.py    builds docs/data season and matchweek files from the simulator
+season_run.py      model-written recaps, answers and translations for one matchweek
+translate.py       translation with number and name checks
+ui_en.py           every interface label (English source)
+live_ask.py        live Ask logic, caps and limits (offline testable)
+function_app.py    Azure Function wrapper for live Ask
 build_site.py      builds docs/data from the simulator
 docs/              the static demo site (GitHub Pages)
 tests/check.py     offline regression check run by GitHub Actions
