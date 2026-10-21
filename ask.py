@@ -21,7 +21,8 @@ TOOL_SPECS = """Tools (call with JSON):
 - injuries() : injury stoppages (who, minute, how long play stopped, whether he was substituted off)
 - substitutions() : every substitution with the reason recorded (injury or tactical)
 - lineup_info(team) : players and positions of a team
-If the question needs something the event log does not contain (formation, tactics, instructions, injuries, fitness, intentions, opinions, players' speed or distance, anything about other matches or real teams), answer {"unanswerable": "<what is missing>"}.""" % (list(STATS), list(STATS))
+- formation(team) : the starting shape (defenders-midfielders-forwards) read from the listed starting positions
+If the question needs something the event log does not contain (changes of shape during play, tactics, instructions, injuries, fitness, intentions, opinions, players' speed or distance, anything about other matches or real teams), answer {"unanswerable": "<what is missing>"}.""" % (list(STATS), list(STATS))
 
 def _players(m):
     out = []
@@ -105,6 +106,15 @@ def run_tool(m, tool, args):
         sb = [e for e in ev if e["type"] == "substitution"]
         if not sb: return {"text": "No substitutions were made.", "receipts": []}
         return {"text": "Substitutions: " + "; ".join(f'{e["team"]} minute {e["minute"]+1}, {e["player"]} replaced {e.get("replaces")} ({e.get("reason", "tactical")})' for e in sb) + ".", "receipts": [e["id"] for e in sb]}
+    if tool == "formation":
+        t = (args.get("team") or "").lower()
+        sd = "home" if t in me["home"].lower() or me["home"].lower() in t else "away" if t in me["away"].lower() or me["away"].lower() in t else None
+        if not sd: return None
+        L = me["lineups"][sd]["players"]; D = [p["pos"] for p in L if p["pos"] in ("RB", "CB", "LB", "RWB", "LWB")]
+        Mi = [p["pos"] for p in L if p["pos"] in ("DM", "CM", "AM", "RM", "LM")]; F = [p["pos"] for p in L if p["pos"] in ("LW", "RW", "ST", "CF")]
+        if len(D) + len(Mi) + len(F) != 10: return None
+        club = me["home"] if sd == "home" else me["away"]
+        return {"text": f'{club} started in a {len(D)}-{len(Mi)}-{len(F)} shape: {len(D)} defenders ({", ".join(D)}), {len(Mi)} midfielders ({", ".join(Mi)}) and {len(F)} forwards ({", ".join(F)}), plus the goalkeeper. This is read from the starting positions in the lineup; changes of shape during play are not recorded.', "receipts": []}
     if tool == "lineup_info":
         t = (args.get("team") or "").lower()
         sd = "home" if t in me["home"].lower() or me["home"].lower() in t else "away" if t in me["away"].lower() or me["away"].lower() in t else None
@@ -123,7 +133,8 @@ class MockPlanner:
         if any(w in ql for w in ["why", "deserve", "unlucky", "lucky"]): return [{"tool": "why_result", "args": {}}]
         if "injur" in ql and "how long" not in ql: return [{"tool": "injuries", "args": {}}]
         if "substitut" in ql and "right" not in ql: return [{"tool": "substitutions", "args": {}}]
-        if any(w in ql for w in ["how long", "tired", "fatigue", "tactic", "formation", "manager", "coach", "instruct", "speed", "km", "feel", "best player in the league", "last season", "transfer"]):
+        if "formation" in ql or "shape" in ql: return [{"tool": "formation", "args": {"team": me["home"] if "home" in ql else me["away"]}}]
+        if any(w in ql for w in ["how long", "tired", "fatigue", "tactic", "manager", "coach", "instruct", "speed", "km", "feel", "best player in the league", "last season", "transfer"]):
             return {"unanswerable": "this is not recorded in the event log"}
         if ("goal" in ql or "scor" in ql) and ("who" in ql or "when" in ql): return [{"tool": "score_timeline", "args": {}}]
         for st in STATS:
@@ -191,7 +202,7 @@ QUESTIONS = [  # (question, should_be_answerable)
     ("How many shots did the away team have?", True), ("Who made the most interceptions?", True), ("How many fouls did the home team commit?", True),
     ("Which player was rated highest and why?", True), ("How many shots did the home team have between minute 60 and 90?", True),
     ("Was the manager right to make that substitution?", False), ("Was anyone injured or tired in the second half?", False),
-    ("What formation did the away team play?", False), ("How fast did the fastest player run?", False),
+    ("What formation did the away team play?", True), ("How fast did the fastest player run?", False),
     ("Is this team better than Bayern Munich?", False), ("Who will win the next match?", False)]
 
 QUESTIONS_SITE = [  # asked on every match on the website
@@ -199,4 +210,4 @@ QUESTIONS_SITE = [  # asked on every match on the website
     ("How many shots did the home team have in the second half?", True), ("Who had the most tackles?", True), ("How many fouls did the away team commit?", True),
     ("Who made the most interceptions?", True),
     ("Was anyone injured?", True),
-    ("What formation did the away team play?", False), ("How long will the injured player be out for?", False), ("Was the referee right to book that player?", False)]
+    ("What formation did the away team play?", True), ("How long will the injured player be out for?", False), ("Was the referee right to book that player?", False)]

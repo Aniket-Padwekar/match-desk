@@ -91,7 +91,8 @@ def analyst(m):
     rt = ratings(m)
     if rt:
         top = max(rt.items(), key=lambda kv: kv[1]["rating"]); pid, r = top
-        add("rating", f'{r["player"]} had the highest rating, {r["rating"]}, on {r["touches"]} touches', pid=pid, value=r["rating"])
+        why_ = [k.split(" (")[0] for k, d, _ in r["drivers"] if abs(d) >= 0.1][:3]
+        add("rating", f'{r["player"]} was the highest-rated player ({r["rating"]})' + (", mainly for " + ", ".join(why_) if why_ else ""), pid=pid, value=r["rating"])
     facts = [{"id": c["id"], "text": c["text"], "claim": c} for c in claims]
     return {"facts": facts, "verdict": v, "why": why_result(m), "moments": key_moments(m)}
 
@@ -155,7 +156,7 @@ class MockLLM:
         return None if f is None else {"text": f["text"] + ".", "fact_ids": [f["id"]]}
 
 STYLE = {
- "fan": "Write like a friendly match report for someone who watched casually. Plain words. Never use the words 'expected goals' or 'xG'. Say 'chances worth 3.6 goals on average (a measure of how good the chances were)' the first time, then 'chance quality'. Tell the story: who scored when, who had the better of it, and why the result came out as it did. Max 7 short sentences.",
+ "fan": "Write like a friendly match report for someone who watched casually. Plain words, varied sentences. Never use the words 'expected goals' or 'xG'. Say 'chances worth 3.6 goals on average (a measure of how good the chances were)' the first time, then 'chance quality'. Tell the story: who scored when, who had the better of it, and why the result came out as it did. Max 7 short sentences.",
  "analyst": "Write for a stats-literate reader. Use the numbers, expected goals (xG), touches share and the 'why' facts. Precise and compact, no filler. Max 7 sentences.",
  "coach": "Write for a coach: what changed, why it mattered, what to take away. Focus on spells, finishing, goalkeeper impact and turning points. No stat dumps. Max 6 sentences."}
 
@@ -175,10 +176,14 @@ class AzureLLM:
         return json.loads(r.choices[0].message.content)
     def write(self, facts, audience, lang):
         sys = ("You are the Storyteller of a verified football match desk. Use ONLY the facts given. Every sentence must cite the fact ids it uses. "
-               "Keep every sentence under 25 words and cite at most 3 facts per sentence; several short sentences beat one long one. Structure: (1) result, (2) the turning points using the score_after facts, (3) the reason the result came out that way using the 'why' facts, (4) one standout player. Always use full team names, never shortened. Never add a number, name, minute, or comparison that the cited facts do not state. Do not use interpretive words such as 'dominated', 'deserved', 'early', "
+               "Keep every sentence under 25 words and cite at most 3 facts per sentence. Write a short, flowing match report of 4 to 6 sentences with NO repetition. The headline already states the final score, so NEVER write a sentence that only restates the score or the goal totals, and never give the same number or fact twice. "
+               "Structure: (1) the goals in order, one sentence per goal naming the scorer, the minute and the running score from the score_after facts (if there are more than 4 goals, join two goals into one sentence); "
+               "(2) ONE sentence comparing both teams' shots and chance quality (merge those facts); (3) ONE sentence on both goalkeepers' saves if given; (4) ONE sentence on why the result came out that way if a 'why' fact is given; (5) ONE sentence on the standout player if a rating fact is given. "
+               "Vary the wording so sentences do not all start the same way. Always use full team names, never shortened. Never add a number, name, minute, or comparison that the cited facts do not state. Do not use interpretive words such as 'dominated', 'deserved', 'early', "
                "'better', 'more' unless a cited fact states the comparison with numbers. Prefer plain description over interpretation. "
                f"Style: {STYLE[audience]} Language: {lang}. "
                'Return JSON: {"headline":"...","sentences":[{"text":"...","fact_ids":[1,2]}]}')
+        facts = [f for f in facts if (f.get("claim") or {}).get("kind") not in ("final_score", "margin") and not re.search(r" scored \d+$", f["text"])]
         return self._chat(sys, json.dumps(facts, ensure_ascii=False))
     def plan(self, m, question):
         from ask import TOOL_SPECS
