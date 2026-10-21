@@ -38,6 +38,18 @@ def _find(m, q):
 
 def _window(e, lo, hi): return (lo is None or e["minute"] >= lo - 1) and (hi is None or e["minute"] < hi)
 
+def _side_of(me, team):
+    t = (team or "").lower().strip()
+    if not t: return None
+    if t in ("home", "home team", "the home team"): return "home"
+    if t in ("away", "away team", "the away team", "visitors"): return "away"
+    h, a = me["home"].lower(), me["away"].lower()
+    if t in h or h in t: return "home"
+    if t in a or a in t: return "away"
+    if "home" in t: return "home"
+    if "away" in t: return "away"
+    return None
+
 def run_tool(m, tool, args):
     """Returns {"text": str, "receipts": [event ids]} or None if the tool cannot answer."""
     ev, me = m["events"], m["meta"]; args = args or {}
@@ -107,8 +119,7 @@ def run_tool(m, tool, args):
         if not sb: return {"text": "No substitutions were made.", "receipts": []}
         return {"text": "Substitutions: " + "; ".join(f'{e["team"]} minute {e["minute"]+1}, {e["player"]} replaced {e.get("replaces")} ({e.get("reason", "tactical")})' for e in sb) + ".", "receipts": [e["id"] for e in sb]}
     if tool == "formation":
-        t = (args.get("team") or "").lower()
-        sd = "home" if t in me["home"].lower() or me["home"].lower() in t else "away" if t in me["away"].lower() or me["away"].lower() in t else None
+        sd = _side_of(me, args.get("team"))
         if not sd: return None
         L = me["lineups"][sd]["players"]; D = [p["pos"] for p in L if p["pos"] in ("RB", "CB", "LB", "RWB", "LWB")]
         Mi = [p["pos"] for p in L if p["pos"] in ("DM", "CM", "AM", "RM", "LM")]; F = [p["pos"] for p in L if p["pos"] in ("LW", "RW", "ST", "CF")]
@@ -116,8 +127,7 @@ def run_tool(m, tool, args):
         club = me["home"] if sd == "home" else me["away"]
         return {"text": f'{club} started in a {len(D)}-{len(Mi)}-{len(F)} shape: {len(D)} defenders ({", ".join(D)}), {len(Mi)} midfielders ({", ".join(Mi)}) and {len(F)} forwards ({", ".join(F)}), plus the goalkeeper. This is read from the starting positions in the lineup; changes of shape during play are not recorded.', "receipts": []}
     if tool == "lineup_info":
-        t = (args.get("team") or "").lower()
-        sd = "home" if t in me["home"].lower() or me["home"].lower() in t else "away" if t in me["away"].lower() or me["away"].lower() in t else None
+        sd = _side_of(me, args.get("team"))
         if not sd: return None
         L = me["lineups"][sd]["players"]
         return {"text": f'{side_name(sd)} started: ' + ", ".join(f'{p["name"]} ({p["pos"]})' for p in L) + ".", "receipts": []}

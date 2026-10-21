@@ -167,7 +167,7 @@ MockLLM.translate_ui = lambda self, texts, lang: _mock_translate(texts, lang)
 class AzureLLM:
     def __init__(self, endpoint, key, deployment):
         from openai import AzureOpenAI
-        self.c = AzureOpenAI(azure_endpoint=endpoint, api_key=key, api_version="2025-04-01-preview"); self.d = deployment
+        self.c = AzureOpenAI(azure_endpoint=endpoint, api_key=key, api_version="2025-04-01-preview", max_retries=8, timeout=180); self.d = deployment
     def _chat(self, system, user):
         kw = dict(model=self.d, max_completion_tokens=6000, response_format={"type": "json_object"},
                   messages=[{"role": "system", "content": system}, {"role": "user", "content": user}])

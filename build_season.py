@@ -37,7 +37,7 @@ def build_match(fx):
             "score": [me["final_score"]["home"], me["final_score"]["away"]], "label": verdict(m)["label"], "shirts": shirts,
             "cols": COLS, "events": [[e.get(c) for c in COLS] for e in ev if e["type"] not in ("possession_change", "kickoff")],
             "timeline": timeline(m), "stats": stats,
-            "facts": [{"id": f["id"], "kind": f["claim"]["kind"], "events": [i for i in fact_events(m, f) if i]} for f in case["facts"]],
+            "facts": [{"id": f["id"], "kind": f["claim"]["kind"], "text": f["text"], "events": [i for i in fact_events(m, f) if i]} for f in case["facts"]],
             "top_rated": [{"player": r["player"], "rating": r["rating"]} for _, r in top]}
 
 def build():

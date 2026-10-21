@@ -46,27 +46,38 @@ def translate_match(pack, names, llm, code, chunk=30):
         t, f = translate_texts(llm, texts[i:i + chunk], code, names); tr += t; fb += sum(f)
     res = unflatten(pack, tr); res["fb"] = fb; return res
 
-def run_week(week, llm, run_recap, out, langs=None, workers=4, log=print):
+def run_week(week, llm, run_recap, out, langs=None, workers=6, log=print):
+    """Matches run in parallel (recap + 11 answers each), then every (language, match) translation runs in parallel."""
     langs = [c for c, _, _ in LANGS if c != "en"] if langs is None else langs
     os.makedirs(f"{out}/lang", exist_ok=True); os.makedirs(f"{out}/ui", exist_ok=True)
-    fx = [f for f in fixtures() if f["week"] == week]; packs, names, t0 = {}, {}, time.time()
-    for i, f in enumerate(fx, 1):
-        m = match_for(f); mid = m["meta"]["match_id"]; names[mid] = names_of(m)
-        log(f"[{i}/{len(fx)}] {m['meta']['home']} {m['meta']['final_score']['home']}-{m['meta']['final_score']['away']} {m['meta']['away']}")
-        packs[mid] = english_pack(m, llm, run_recap, log)
-        log("   recap", packs[mid]["stats"], "| questions", len(packs[mid]["ask"]), f"| {int(time.time()-t0)}s")
-        json.dump(packs, open(f"{out}/lang/mw{week}_en.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
-    def one(code):
-        res = {mid: translate_match(p, names[mid], llm, code) for mid, p in packs.items()}
-        json.dump(res, open(f"{out}/lang/mw{week}_{code}.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
-        return code, sum(r["fb"] for r in res.values())
+    fx = [f for f in fixtures() if f["week"] == week]; t0 = time.time(); matches = [match_for(f) for f in fx]
+    names = {m["meta"]["match_id"]: names_of(m) for m in matches}
+    def gen(m):
+        mid = m["meta"]["match_id"]; p = english_pack(m, llm, run_recap, log)
+        log(f"   done {m['meta']['home']} {m['meta']['final_score']['home']}-{m['meta']['final_score']['away']} {m['meta']['away']} | recap {p['stats']} | {int(time.time()-t0)}s")
+        return mid, p
+    packs = {}
     with ThreadPoolExecutor(workers) as ex:
-        for code, fb in ex.map(one, langs): log(f"   translated {code}: {fb} items kept in English because the check failed")
-    for code in ["en"] + langs:
+        for mid, p in ex.map(gen, matches): packs[mid] = p
+    json.dump(packs, open(f"{out}/lang/mw{week}_en.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+    log(f"English done in {int((time.time()-t0)/60)} min. Translating into {len(langs)} languages ...")
+    jobs = [(c, mid) for c in langs for mid in packs]; res = {c: {} for c in langs}; fbs = {c: 0 for c in langs}
+    def tr(job):
+        c, mid = job; r = translate_match(packs[mid], names[mid], llm, c); return c, mid, r
+    with ThreadPoolExecutor(workers) as ex:
+        for c, mid, r in ex.map(tr, jobs): res[c][mid] = r; fbs[c] += r["fb"]
+    for c in langs:
+        json.dump(res[c], open(f"{out}/lang/mw{week}_{c}.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+        log(f"   translated {c}: {fbs[c]} items kept in English because the check failed")
+    for code in ["en"] + langs:   # interface labels: translate only the labels that are missing from the existing file
         p = f"{out}/ui/{code}.json"
-        if os.path.exists(p): continue
-        if code == "en": ui, bad = dict(UI_EN), 0
-        else: ui, bad = translate_ui(llm, UI_EN, code)
-        json.dump(ui, open(p, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
-        if bad: log(f"   ui {code}: {bad} labels kept in English")
+        cur = json.load(open(p, encoding="utf-8")) if os.path.exists(p) else {}
+        if code == "en": cur = dict(UI_EN)
+        else:
+            miss = {k: v for k, v in UI_EN.items() if k not in cur}
+            if miss:
+                t_, bad = translate_ui(llm, miss, code); cur.update(t_)
+                if bad: log(f"   ui {code}: {bad} labels kept in English")
+        json.dump({k: cur.get(k, UI_EN[k]) for k in UI_EN}, open(p, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+    log(f"Matchweek {week} finished in {int((time.time()-t0)/60)} minutes.")
     return packs

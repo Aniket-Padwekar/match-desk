@@ -46,9 +46,9 @@ def ratings(m):
 def explain_rating(m, pid):
     r = ratings(m)[pid]
     top = [d for d in r["drivers"] if abs(d[1]) >= 0.1][:3]
-    bits = ", ".join(f'{k} ({d:+.1f})' for k, d, _ in top) or "many small contributions"
+    bits = ", ".join(f'{k.split(" (")[0]} ({d:+.1f})' for k, d, _ in top) or "many small contributions"
     return {"player": r["player"], "rating": r["rating"], "touches": r["touches"],
-            "text": f'{r["player"]} rated {r["rating"]} on {r["touches"]} touches: base 6.0 plus {bits}.',
+            "text": f'{r["player"]} rated {r["rating"]}: base 6.0 plus {bits}.',
             "receipts": [i for _, _, ids in top for i in ids][:12]}
 
 def why_result(m):
