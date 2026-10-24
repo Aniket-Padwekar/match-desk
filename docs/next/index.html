@@ -147,12 +147,15 @@ input[type=range]{flex:1;min-width:140px;accent-color:#0B0B0C}
 .lr .who{display:grid}.lr .who small{opacity:.65;font-size:11px}.lr .no{opacity:.6;font-weight:700}.lr .mn{display:flex;gap:6px;align-items:center;font:800 12px var(--body)}.lr .on{color:#3DDC84}
 #pm{position:fixed;inset:0;z-index:50;display:grid;place-items:center;padding:16px}#pm[hidden]{display:none}.pmb{position:absolute;inset:0;background:#000a}
 .pmd{position:relative;width:min(460px,100%);max-height:calc(100dvh - 32px);overflow:auto;padding:0!important;border-radius:22px}
+.pmh2{position:relative;overflow:hidden;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:22px 18px 16px;background:var(--pc);color:var(--pk)}.big-no{position:absolute;right:8px;top:-14px;font:var(--dw) 120px/1 var(--disp);opacity:.18}.pmt2{position:relative}.pmt2 small{font:800 11px var(--body);letter-spacing:.08em;text-transform:uppercase;opacity:.85}.pmt2 h3{margin:4px 0 0;font:var(--dw) calc(26px*var(--k))/1.05 var(--disp);text-transform:uppercase}.pmr{position:relative;text-align:center;padding:8px 12px;border-radius:12px;color:#0B0B0C;min-width:64px}.pmr b{display:block;font:var(--dw) 26px/1 var(--disp)}.pmr span{font:800 10px var(--body);text-transform:uppercase}.pmr.g{background:#3DDC84}.pmr.o{background:#FFA24B}.pmr.r{background:#FF6B6B}.pmr.b{background:#5AB0FF}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0 4px}.pt2{border:1px solid #8886;border-radius:12px;padding:10px 8px;text-align:center}.pt2 b{display:block;font:var(--dw) 20px/1.1 var(--disp)}.pt2 span{font:700 10px var(--body);opacity:.75;text-transform:uppercase}
+.pgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 4px}.pgrid div{display:flex;justify-content:space-between;border-bottom:1px solid #8884;padding:6px 0}.pgrid b{font-weight:800}
 .pmh{padding:18px 18px 12px;text-align:center;position:relative}.pma{display:inline-block;position:relative}.av.big{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;font:800 24px var(--body);border:3px solid #fff}.pma .rt{position:absolute;top:-6px;right:-18px;font-size:13px}
 .pmn{position:absolute;top:30px;width:38px;height:38px;border-radius:50%;border:0;background:#000a;color:#fff;font-size:22px}.pmn:first-child{left:14px}.pmn[data-pmn="1"]{right:14px}
 .pmh h3{margin:10px 0 12px;font:var(--dw) 20px var(--disp)}.pmm{display:flex;justify-content:space-around}.pmm span{display:grid;font:700 11px var(--body);opacity:.85}.pmm b{font:800 16px var(--body);opacity:1}
 .pmc{padding:6px 18px 4px}.pmt{display:flex;justify-content:space-between;margin:12px 0 6px;font:800 14px var(--body)}.pmt span{font-weight:700;opacity:.8}.heat{width:100%;border-radius:12px;display:block}
 .hl{margin:12px 0;padding:10px 12px;border-radius:12px;background:#3DDC8422}.hl p{margin:4px 0 0}.sr{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #8884}
-.pmf{display:flex;justify-content:flex-end;padding:12px 18px 16px;position:sticky;bottom:0;background:inherit}
+.pmf{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:12px 18px 16px;position:sticky;bottom:0;background:inherit}.pmf .go{margin-inline-start:auto}
 html[data-mode="light"] .pn{color:#fff}
 @media(max-width:700px){.lpitch{aspect-ratio:68/105}.lh-h{display:none}.lh-v{display:block}.pn{left:var(--vx);top:var(--vy)}.pls .lhs{flex-direction:column}.lh.away{flex-direction:row;text-align:start}}
 .agents{margin:10px 0 0;padding:0;list-style:none;display:grid;gap:8px}
@@ -287,8 +290,8 @@ function moments(m,ids){const {by}=evMap(m);const seen=new Set(),out=[];const ev
 function lines(){return`<g fill="none" stroke="#fff" stroke-opacity=".5" stroke-width=".25"><rect x="0" y="0" width="105" height="68"/><path d="M52.5 0V68"/><circle cx="52.5" cy="34" r="9.15"/><rect x="0" y="13.84" width="16.5" height="40.32"/><rect x="88.5" y="13.84" width="16.5" height="40.32"/><rect x="0" y="24.84" width="5.5" height="18.32"/><rect x="99.5" y="24.84" width="5.5" height="18.32"/><path d="M16.5 26.7a9.15 9.15 0 0 1 0 14.6M88.5 26.7a9.15 9.15 0 0 0 0 14.6"/></g><g fill="#fff" fill-opacity=".6"><circle cx="52.5" cy="34" r=".35"/><circle cx="11" cy="34" r=".35"/><circle cx="94" cy="34" r=".35"/></g>`}
 const DEFS=`<defs><marker id="ah" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.4" markerHeight="3.4" orient="auto"><path d="M0 1L10 5L0 9z" fill="#fff"/></marker><marker id="ah2" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="3.4" markerHeight="3.4" orient="auto"><path d="M0 1L10 5L0 9z" fill="#D4FF3A"/></marker></defs>`;
 const TEAMC=side=>side==="home"?"#D4FF3A":"#62B6FF";
-function marker(e,num,label,r=1.7,x=GX(e),y=GY(e),vx0,vx1){const an=x>vx1-9?"end":x<vx0+9?"start":"middle",dx=an==="end"?2.4:an==="start"?-2.4:0;
-  return`<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)})"><circle r="${r}" fill="${TEAMC(e.side)}" stroke="#0B0B0C" stroke-width=".28"/><text y=".55" font-family="Archivo Black,Arial Black,sans-serif" font-size="1.55" text-anchor="middle" fill="#0B0B0C">${num||""}</text>${label?`<text x="${dx}" y="${y<7?4.1:-2.7}" font-family="Figtree,sans-serif" font-weight="800" font-size="1.7" text-anchor="${an}" fill="#fff" stroke="#0B0B0C" stroke-width=".32" paint-order="stroke">${esc(sur(e.player))}</text>`:""}</g>`}
+function marker(e,num,label,r=1.7,x=GX(e),y=GY(e),vx0,vx1,sc=1){const an=x>vx1-9?"end":x<vx0+9?"start":"middle",dx=an==="end"?2.4:an==="start"?-2.4:0;
+  return`<g transform="translate(${x.toFixed(2)} ${y.toFixed(2)}) scale(${sc.toFixed(3)})"><circle r="${r}" fill="${TEAMC(e.side)}" stroke="#0B0B0C" stroke-width=".28"/><text y=".55" font-family="Archivo Black,Arial Black,sans-serif" font-size="1.55" text-anchor="middle" fill="#0B0B0C">${num||""}</text>${label?`<text x="${dx}" y="${y<7?4.1:-2.7}" font-family="Figtree,sans-serif" font-weight="800" font-size="1.7" text-anchor="${an}" fill="#fff" stroke="#0B0B0C" stroke-width=".32" paint-order="stroke">${esc(sur(e.player))}</text>`:""}</g>`}
 function build(m,mo){const {poss}=evMap(m);let shot=null,pts=[];
   if(mo.kind==="shot"){shot=mo.shot;pts=(poss.get(shot.possession)||[]).filter(e=>e.id<shot.id&&CHAIN.has(e.type)&&e.side===shot.side&&e.x!=null&&!(e.type==="pass"&&e.outcome&&!/^complete/.test(e.outcome))).slice(-3);pts.push(shot)}
   else if(mo.kind==="multi")pts=mo.es;else pts=[mo.e];
@@ -302,20 +305,20 @@ function pitchSVG(m,mo){const {pts,shot}=build(m,mo);const dir=pts[0].side==="ho
   const padx=single?20:8,pady=single?14:8;x0-=padx;x1+=padx;y0-=pady;y1+=pady;
   let w=Math.max(x1-x0,single?52:36),h=Math.max(y1-y0,single?36:26);const ar=1.55;if(w/h<ar)w=h*ar;else h=w/ar;
   let cx=(x0+x1)/2,cy=(y0+y1)/2;cx=Math.min(Math.max(cx,-2+w/2),107-w/2);cy=Math.min(Math.max(cy,-2+h/2),70-h/2);if(w>109){w=109;cx=52.5}if(h>72){h=72;cy=34}
-  const vb=[cx-w/2,cy-h/2,w,h].map(n=>n.toFixed(1)),vx0=+vb[0],vx1=+vb[0]+ +vb[2];
+  const vb=[cx-w/2,cy-h/2,w,h].map(n=>n.toFixed(1)),vx0=+vb[0],vx1=+vb[0]+ +vb[2],sc=Math.min(1.5,Math.max(.5,+vb[2]/80)),sw=n=>(n*sc).toFixed(2);
   let s=`<svg class="pitchsvg" viewBox="${vb.join(" ")}" role="img" aria-label="${esc(t("pitch_label"))}">${DEFS}<rect x="-10" y="-10" width="130" height="90" fill="#17643B"/>${lines()}`;
   if(shot)s+=`<rect x="${dir>0?105:-1}" y="30.34" width="1" height="7.32" fill="#D4FF3A" fill-opacity=".9"/>`;
   if(mo.kind!=="multi")for(let i=0;i<pts.length-1;i++){const a=pts[i],b=pts[i+1];if(!["pass","corner","free_kick","goal_kick","dribble"].includes(a.type))continue;
     const ex=a.end_x!=null?GEX(a):GX(b),ey=a.end_x!=null?GEY(a):GY(b);
-    s+=`<path d="M${GX(a).toFixed(1)} ${GY(a).toFixed(1)}L${ex.toFixed(1)} ${ey.toFixed(1)}" stroke="#fff" stroke-opacity=".9" stroke-width=".32" ${a.type==="dribble"?'stroke-dasharray=".5 .9" stroke-linecap="round"':""} marker-end="url(#ah)" fill="none"/>`}
+    s+=`<path d="M${GX(a).toFixed(1)} ${GY(a).toFixed(1)}L${ex.toFixed(1)} ${ey.toFixed(1)}" stroke="#fff" stroke-opacity=".9" stroke-width="${sw(.32)}" ${a.type==="dribble"?`stroke-dasharray="${sw(.5)} ${sw(.9)}" stroke-linecap="round"`:""} marker-end="url(#ah)" fill="none"/>`}
   const sv=shot&&shot.outcome==="saved"?evMap(m).by.get(shot.id+1):null;const gk=sv&&sv.type==="save"?sv:null;
-  if(shot){s+=`<path d="M${GX(shot).toFixed(1)} ${GY(shot).toFixed(1)}L${tgt.x.toFixed(1)} ${tgt.y.toFixed(1)}" stroke="#D4FF3A" stroke-width=".42" stroke-dasharray="1.1 .8" ${mark==="blk"?"":'marker-end="url(#ah2)"'} fill="none"/>`;
-    if(mark==="blk")s+=`<path d="M${tgt.x-.8} ${tgt.y-.8}l1.6 1.6m0-1.6l-1.6 1.6" stroke="#D4FF3A" stroke-width=".4"/>`}
+  if(shot){s+=`<path d="M${GX(shot).toFixed(1)} ${GY(shot).toFixed(1)}L${tgt.x.toFixed(1)} ${tgt.y.toFixed(1)}" stroke="#D4FF3A" stroke-width="${sw(.42)}" stroke-dasharray="${sw(1.1)} ${sw(.8)}" ${mark==="blk"?"":'marker-end="url(#ah2)"'} fill="none"/>`;
+    if(mark==="blk")s+=`<path d="M${tgt.x-.8} ${tgt.y-.8}l1.6 1.6m0-1.6l-1.6 1.6" stroke="#D4FF3A" stroke-width="${sw(.4)}"/>`}
   const lab=new Set();let prev=null;
   pts.forEach(e=>{const isShot=shot&&e===shot,big=mo.kind==="multi"?e===pts[0]:(isShot||e.player!==prev);prev=e.player;
-    if(big){const sl=isShot||(!lab.has(e.player)&&!(shot&&e.player===shot.player));lab.add(e.player);s+=marker(e,m.shirts[e.player],sl,isShot?1.9:1.6,GX(e),GY(e),vx0,vx1)}
-    else s+=`<circle cx="${GX(e).toFixed(1)}" cy="${GY(e).toFixed(1)}" r=".75" fill="${TEAMC(e.side)}" stroke="#0B0B0C" stroke-width=".2"/>`});
-  if(gk&&tgt)s+=marker(gk,m.shirts[gk.player],true,1.6,tgt.x+(dir>0?-1.8:1.8),tgt.y,vx0,vx1);
+    if(big){const sl=isShot||(!lab.has(e.player)&&!(shot&&e.player===shot.player));lab.add(e.player);s+=marker(e,m.shirts[e.player],sl,isShot?1.9:1.6,GX(e),GY(e),vx0,vx1,sc)}
+    else s+=`<circle cx="${GX(e).toFixed(1)}" cy="${GY(e).toFixed(1)}" r="${sw(.75)}" fill="${TEAMC(e.side)}" stroke="#0B0B0C" stroke-width=".2"/>`});
+  if(gk&&tgt)s+=marker(gk,m.shirts[gk.player],true,1.6,tgt.x+(dir>0?-1.8*sc:1.8*sc),tgt.y,vx0,vx1,sc);
   return{svg:s+"</svg>",shot,min:Math.floor(pts[pts.length-1].minute)+1}}
 function legendHTML(){const m=M();return`<div class="legend"><span><i class="dot" style="background:#D4FF3A"></i>${esc(t("legend_home",{team:m.home}))}</span><span><i class="dot" style="background:#62B6FF"></i>${esc(t("legend_away",{team:m.away}))}</span></div>`}
 function evidenceHTML(){const m=M();const ids=S.sel&&S.sel.ids||[];const mos=ids.length?moments(m,ids):[];
@@ -352,7 +355,7 @@ function shell(){stop();const app=$("#app");
    <div class="tape">${row("s_shots",st.home.shots,st.away.shots)}${row("s_xg",st.home.xg,st.away.xg,v=>v.toFixed(2))}${row("s_poss",st.home.poss,st.away.poss,v=>Math.round(v)+"%")}${row("s_saves",st.home.saves,st.away.saves)}</div></section>
   <nav class="tabs" role="tablist">${["recap","replay","ask","table","trust"].map(k=>`<button class="tab" role="tab" data-tab="${k}" aria-selected="${S.tab===k}">${esc(t(k==="table"?"table":k==="trust"?"tab_check":"tab_"+k))}</button>`).join("")}</nav>
   <main id="view"></main>
-  <footer><span>${esc(t("synthetic"))}</span><span>${esc(t("footer"))} · build 18</span></footer>`;
+  <footer><span>${esc(t("synthetic"))}</span><span>${esc(t("footer"))} · build 19</span></footer>`;
   view()}
 function view(){const v={recap:viewRecap,replay:viewReplay,ask:viewAsk,trust:viewTrust,table:viewTable}[S.tab];v();fitRoll()}
 function autoSel(){const m=M(),en=EN();S.sel=null;S.mom=0;if(!m||!en||!en.sentences)return;
@@ -393,8 +396,8 @@ function pStats(m,side,name,pl){const {all}=evMap(m),mine=all.filter(e=>e.side==
   const sh=c("shot"),ps=c("pass"),mins=(pl.off||end)-(pl.on?pl.on-1:0);
   return{mins:Math.max(0,mins),touches:mine.filter(e=>e.x!=null).length,g:c("goal").length,s:sh.length,xg:sh.reduce((a,e)=>a+(e.xg||0),0),p:ps.length,pc:ps.filter(e=>e.outcome==="complete").length,t:c("tackle").length,i:c("interception").length,f:c("foul").length,d:c("dribble").length,sv:c("save").length,pts:mine.filter(e=>e.x!=null&&e.type!=="substitution")}}
 function heatSVG(pts){const GW=21,GH=14,G=Array.from({length:GH},()=>Array(GW).fill(0));pts.forEach(e=>{const gx=Math.min(GW-1,Math.floor(e.x/100*GW)),gy=Math.min(GH-1,Math.floor(e.y/100*GH));G[gy][gx]++});
-  const mx=Math.max(1,...G.flat());let r="";G.forEach((row,y)=>row.forEach((v,x)=>{if(!v)return;const n=Math.sqrt(v/mx);r+=`<rect x="${(x*105/GW).toFixed(1)}" y="${(y*68/GH).toFixed(1)}" width="${(105/GW+.4).toFixed(1)}" height="${(68/GH+.4).toFixed(1)}" fill="hsl(${(125-125*n).toFixed(0)} 90% 50%)" fill-opacity="${(.25+.6*n).toFixed(2)}"/>`}));
-  return`<svg class="heat" viewBox="-2 -2 109 72" role="img" aria-label="${esc(t("pm_heat"))}"><rect x="-10" y="-10" width="130" height="90" fill="#1d4d33"/><g filter="url(#hb)">${r}</g>${lines()}<defs><filter id="hb"><feGaussianBlur stdDeviation="2.2"/></filter></defs></svg>`}
+  const mx=Math.max(1,...G.flat());let r="";G.forEach((row,y)=>row.forEach((v,x)=>{if(!v)return;const n=Math.sqrt(v/mx);r+=`<rect x="${(x*105/GW).toFixed(1)}" y="${(y*68/GH).toFixed(1)}" width="${(105/GW+.4).toFixed(1)}" height="${(68/GH+.4).toFixed(1)}" fill="#FFFF04" fill-opacity="${(.1+.8*n).toFixed(2)}"/>`}));
+  return`<svg class="heat" viewBox="-2 -2 109 72" role="img" aria-label="${esc(t("pm_heat"))}"><rect x="-10" y="-10" width="130" height="90" fill="#0f3a24"/><g filter="url(#hb)">${r}</g>${lines()}<defs><filter id="hb"><feGaussianBlur stdDeviation="2.2"/></filter></defs></svg>`}
 function flatPlayers(m){const P=S.players[m.id],out=[];["home","away"].forEach(sd=>["starters","subs"].forEach(g=>P[sd][g].forEach((pl,i)=>out.push({sd,g,i,pl}))));return out}
 function playerSection(m){const P=S.players&&S.players[m.id];if(!P)return tableOnly(m);
   const tc=sd=>clubC(sd==="home"?m.home:m.away),bestN=P.best;
@@ -417,20 +420,22 @@ function tableOnly(m,bare){const all=playerRows(m);const one=sd=>{const rows=all
 let pmFocus=null;
 function openPlayer(k){const m=M(),L=flatPlayers(m),cur=L.findIndex(x=>x.sd+":"+x.g+":"+x.i===k);if(cur<0)return;S.pmKey=k;const {sd,pl}=L[cur],P=S.players[m.id],st=pStats(m,sd,pl.name,pl),c=clubC(sd==="home"?m.home:m.away),best=P.best===pl.name;
   const allSt=["home","away"].flatMap(x=>[...P[x].starters,...P[x].subs]).map(p=>pStats(m,x2(P,p),p.name,p)),maxSh=Math.max(...allSt.map(x=>x.s)),maxT=Math.max(...allSt.map(x=>x.t));
-  const hl=[];if(best)hl.push(t("hl_best",{r:pl.r.toFixed(1)}));pl.goals.forEach(g=>hl.push(t("hl_goal",{m:g})));if(st.s>=2&&st.s===maxSh)hl.push(t("hl_shots",{n:st.s}));if(st.t>=3&&st.t===maxT)hl.push(t("hl_tackles",{n:st.t}));if(!hl.length)hl.push(t("hl_none"));
+  const hl=[];if(best)hl.push(t("hl_best",{r:pl.r.toFixed(1)}));pl.goals.forEach(g=>hl.push(t("hl_goal",{m:g})));if(st.s>=2&&st.s===maxSh)hl.push(t("hl_shots",{n:st.s}));if(st.t>=3&&st.t===maxT)hl.push(t("hl_tackles",{n:st.t}));
   const row=(a,b)=>`<div class="sr"><span>${esc(a)}</span><b>${b}</b></div>`;
   let el=document.getElementById("pm");if(!el){el=document.createElement("div");el.id="pm";document.body.appendChild(el)}
   if(!pmFocus)pmFocus=document.activeElement;
+  const tile=(v,l)=>`<div class="pt2"><b>${v}</b><span>${esc(l)}</span></div>`,acc=st.p?Math.round(100*st.pc/st.p)+"%":"–";
   el.innerHTML=`<div class="pmb" data-pmx="1"></div><div class="pmd blk c-white" role="dialog" aria-modal="true" aria-label="${esc(pl.name)}">
-   <div class="pmh" style="background:linear-gradient(180deg,${c}99,transparent)"><button class="pmn" data-pmn="-1" aria-label="${esc(t("pm_prev"))}">‹</button>
-   <div class="pma"><span class="av big" style="background:${c};color:${ink(c)}">${pl.n}</span>${pl.r!=null?`<b class="rt ${ratingCls(pl.r,best)}">${pl.r.toFixed(1)}${best?" ★":""}</b>`:""}</div><button class="pmn" data-pmn="1" aria-label="${esc(t("pm_next"))}">›</button>
-   <h3>${esc(pl.name)}</h3><div class="pmm"><span><b>${esc(pl.pos)}</b>${esc(t("pm_pos"))}</span><span><b>${pl.n}</b>${esc(t("pm_shirt"))}</span><span><b>${st.mins}'</b>${esc(t("pm_minutes"))}</span></div></div>
-   <div class="pmc"><div class="pmt"><b>${esc(t("pm_heat"))}</b><span>${esc(t("pm_touches"))} ${st.touches}</span></div>${heatSVG(st.pts)}
-   ${pl.on?`<p class="note">${esc(t("pm_on",{name:pl.for,m:pl.on}))}</p>`:""}${pl.off?`<p class="note">${esc(t("pm_off",{m:pl.off}))}</p>`:""}
-   <div class="hl"><b>${esc(t("pm_hl"))}</b>${hl.map(x=>`<p>${esc(x)}</p>`).join("")}</div>
-   <div class="pmt"><b>${esc(t("pm_stats"))}</b></div>
-   ${row(t("pm_minutes"),st.mins)}${row(t("pl_goals"),st.g)}${row(t("s_shots"),st.s)}${row(t("s_xg"),st.xg.toFixed(2))}${row(t("pl_passes"),st.p)}${row(t("pl_acc"),st.p?Math.round(100*st.pc/st.p)+"%":"–")}${row(t("pl_tackles"),st.t)}${row(t("pl_int"),st.i)}${row(t("pm_dribbles"),st.d)}${row(t("s_fouls"),st.f)}${pl.pos==="GK"?row(t("pm_saves"),st.sv):""}</div>
-   <div class="pmf"><span></span><button class="go" data-pmx="1" id="pmdone">${esc(t("pm_done"))}</button></div></div>`;
+   <div class="pmh2" style="--pc:${c};--pk:${ink(c)}"><span class="big-no" aria-hidden="true">${pl.n}</span>
+    <div class="pmt2"><small>${esc(sd==="home"?m.home:m.away)} · ${esc(pl.pos)} · ${esc(t("pm_shirt"))} ${pl.n}</small><h3>${esc(pl.name)}</h3></div>
+    ${pl.r!=null?`<div class="pmr ${ratingCls(pl.r,best)}"><b>${pl.r.toFixed(1)}${best?" ★":""}</b><span>${esc(t("pm_rating"))}</span></div>`:""}</div>
+   <div class="pmc">
+    <div class="tiles">${tile(st.mins+"'",t("pm_minutes"))}${tile(st.g,t("pl_goals"))}${tile(st.s,t("s_shots"))}${tile(st.p+" · "+acc,t("pl_passes"))}</div>
+    <div class="pmt"><b>${esc(t("pm_heat"))}</b><span>${esc(t("pm_touches"))} ${st.touches}</span></div>${heatSVG(st.pts)}
+    ${pl.on?`<p class="note">${esc(t("pm_on",{name:pl.for,m:pl.on}))}</p>`:""}${pl.off?`<p class="note">${esc(t("pm_off",{m:pl.off}))}</p>`:""}
+    ${hl.length?`<div class="hl"><b>${esc(t("pm_hl"))}</b>${hl.map(x=>`<p>${esc(x)}</p>`).join("")}</div>`:""}
+    <div class="pgrid">${[["s_xg",st.xg.toFixed(2)],["pl_tackles",st.t],["pl_int",st.i],["pm_dribbles",st.d],["s_fouls",st.f]].concat(pl.pos==="GK"?[["pm_saves",st.sv]]:[]).map(([k,v])=>`<div><span>${esc(t(k))}</span><b>${v}</b></div>`).join("")}</div></div>
+   <div class="pmf"><button class="ghost" data-pmn="-1">‹ ${esc(t("pm_prev"))}</button><button class="ghost" data-pmn="1">${esc(t("pm_next"))} ›</button><button class="go" data-pmx="1" id="pmdone">${esc(t("pm_done"))}</button></div></div>`;
   el.hidden=false;document.body.style.overflow="hidden";const d=el.querySelector("#pmdone");if(d)d.focus()}
 const x2=(P,p)=>P.home.starters.includes(p)||P.home.subs.includes(p)?"home":"away";
 function closePlayer(){const el=document.getElementById("pm");if(el){el.hidden=true;el.innerHTML=""}document.body.style.overflow="";if(pmFocus&&pmFocus.focus)try{pmFocus.focus()}catch(e){}pmFocus=null;S.pmKey=null}

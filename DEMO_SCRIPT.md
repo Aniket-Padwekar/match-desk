@@ -28,3 +28,13 @@ Record the live site, one match open (Harbourside City 1-0 Redcliffe Athletic). 
 "Built with Microsoft Foundry, Agent Framework and Azure OpenAI. Synthetic data only. Thank you."
 
 Before recording: hard refresh (Ctrl+F5), check the footer shows the latest build, keep the video under 2:00.
+
+## How to record (Windows 11, free)
+
+Rules I could confirm: video under 2 minutes, submitted by 27 Oct 23:59 Pacific. I found nothing saying you must appear on camera, but I could not reach the official rules page, so check it, or ask reactor@microsoft.com, for video hosting and on-camera rules.
+
+1. Open the live site in Chrome, hard refresh (Ctrl+F5), set the browser zoom so the page fills the screen (Ctrl + and Ctrl -), and close other tabs and notifications.
+2. Open **Clipchamp** (type it in the Start menu). Choose **Record** then **Screen** (no camera needed). Record the demo in one or two takes, following the script.
+3. Voice: either record your own voice (Record, Audio) while you click, or use Clipchamp's **Text to speech** with the script text and pick an English voice. If you use a synthetic voice, say so in the video description.
+4. Trim to under 1:55, **Export** at 1080p, upload to YouTube as **Public** or **Unlisted** (check the rules for which is accepted), and put the link in your submission.
+5. Watch the exported file once with sound before submitting.
