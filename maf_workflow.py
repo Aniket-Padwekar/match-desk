@@ -47,6 +47,9 @@ def build_workflow(llm):
             .build())
 
 async def arun(m, llm, audience="fan", lang="English"):
+    try:
+        import tracing; tracing.enable_tracing()   # optional, off unless a connection string is set
+    except Exception: pass
     result = await build_workflow(llm).run({"m": m, "audience": audience, "lang": lang, "max_fix": 1})
     return result.get_outputs()[0]
 

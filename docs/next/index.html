@@ -130,6 +130,7 @@ input[type=range]{flex:1;min-width:140px;accent-color:#0B0B0C}
 .rows{display:grid;gap:8px;margin-top:8px}
 .rw{display:grid;grid-template-columns:minmax(120px,1fr) 3fr auto;gap:10px;align-items:center;font:700 13px var(--body)}
 .rw .bar{height:14px;border:2px solid var(--ink);background:#fff}.rw .bar i{left:0;right:auto;background:var(--ink)}
+.ptw{overflow-x:auto;margin-top:6px}.pt{width:100%;border-collapse:collapse;font-size:13.5px}.pt th{text-align:start;font:800 11px var(--body);letter-spacing:.06em;text-transform:uppercase;padding:6px 10px 6px 0;white-space:nowrap;opacity:.8}.pt td{padding:7px 10px 7px 0;border-bottom:1px solid #8884;white-space:nowrap}.pt td:first-child{font-weight:800}.pt td:not(:first-child),.pt th:not(:first-child){text-align:end}
 .agents{margin:10px 0 0;padding:0;list-style:none;display:grid;gap:8px}
 .agents li{display:grid;grid-template-columns:8em 1fr;gap:10px;padding:8px 10px;background:var(--soft);border:2px solid var(--ink);border-radius:10px;font-size:13.5px}
 @media(max-width:620px){.agents li,.trace li{grid-template-columns:1fr}}
@@ -167,6 +168,7 @@ html:not([data-mode="light"]) .c-white .play,html:not([data-mode="light"]) .c-wh
 html:not([data-mode="light"]) .c-white .ask input,html:not([data-mode="light"]) textarea{background:#232323;color:#fff;border-color:#555}
 html:not([data-mode="light"]) .c-white .rw .bar{background:#232323;border-color:#555}html:not([data-mode="light"]) .c-white .rw .bar i{background:var(--lime)}
 html:not([data-mode="light"]) .c-white .verdict{background:#232323}
+html:not([data-mode="light"]) .c-white .vb{--ink:#0B0B0C;color:#0B0B0C;border-color:#0B0B0C}
 html:not([data-mode="light"]) .c-white input[type=range]{accent-color:var(--lime)}
 html:not([data-mode="light"]) .c-white .mini{background:#0B0B0C}
 html:not([data-mode="light"]) .c-white th,html:not([data-mode="light"]) .c-white td{border-bottom-color:#ffffff22}
@@ -188,14 +190,14 @@ html[data-mode="light"] .board .bdg{border-color:#0B0B0C}
 const LANGS=[["en","English","ltr"],["de","Deutsch","ltr"],["fr","Français","ltr"],["es","Español","ltr"],["it","Italiano","ltr"],["pt","Português","ltr"],["nl","Nederlands","ltr"],["pl","Polski","ltr"],["sv","Svenska","ltr"],["da","Dansk","ltr"],["fi","Suomi","ltr"],["cs","Čeština","ltr"],["ro","Română","ltr"],["el","Ελληνικά","ltr"],["hu","Magyar","ltr"],["tr","Türkçe","ltr"],["ar","العربية","rtl"],["hi","हिन्दी","ltr"],["ja","日本語","ltr"],["zh","中文","ltr"]];
 const FONTS={ar:"Noto+Sans+Arabic:wght@500;800",hi:"Noto+Sans+Devanagari:wght@500;800",ja:"Noto+Sans+JP:wght@500;900",zh:"Noto+Sans+SC:wght@500;900",el:"Noto+Sans:wght@500;800"};
 const S={lang:"en",mw:1,mid:null,tab:"recap",season:null,cfg:{},uiEn:{},ui:{},mwd:{},en:{},tr:{},score:null,sel:null,mom:0,q:null,live:null,busy:false,busy2:false,err:null,
-  t:0,playing:false,speed:1,timer:null,tryIdx:0,tryText:null};
+  t:0,playing:false,speed:1,timer:null,tryIdx:0,tryText:null,plSide:"home"};
 const DATA=(document.querySelector('meta[name="data-root"]')||{}).content||"data/";
 const cache={};
 const J=u=>cache[u]||(cache[u]=fetch(u,{cache:"no-cache"}).then(r=>{if(!r.ok)throw new Error(u+" "+r.status);return r.json()}).catch(e=>{delete cache[u];throw e}));
 const $=s=>document.querySelector(s);
 const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const store={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
-function t(k,v){let s=(S.ui&&S.ui[k])||S.uiEn[k]||k;if(v)for(const x in v)s=s.split("{"+x+"}").join(v[x]);return s}
+function t(k,v){let s=(S.ui&&S.ui[k])||(S.patch&&((S.patch[S.lang]||{})[k]||(S.patch.en||{})[k]))||S.uiEn[k]||k;if(v)for(const x in v)s=s.split("{"+x+"}").join(v[x]);return s}
 const sur=n=>n.split(" ").slice(-1)[0];
 const M=()=>S.mwd[S.mw]&&S.mwd[S.mw].matches.find(m=>m.id===S.mid);
 const EN=()=>S.en[S.mw]&&S.en[S.mw][S.mid];
@@ -324,7 +326,7 @@ function shell(){stop();const app=$("#app");
   <section class="blk c-lime board" aria-label="Scoreboard" style="--hc:${clubC(m.home)};--ac:${clubC(m.away)}"><div class="score"><div class="team h">${bdg(m.home)}${esc(m.home)}<small>${esc(t("home_k"))}</small></div><div class="num">${m.score[0]}–${m.score[1]}</div><div class="team a">${bdg(m.away)}${esc(m.away)}<small>${esc(t("away_k"))}</small></div></div>
    <span class="verdict">${esc(t("flag_"+m.label))}</span>
    <div class="tape">${row("s_shots",st.home.shots,st.away.shots)}${row("s_xg",st.home.xg,st.away.xg,v=>v.toFixed(2))}${row("s_poss",st.home.poss,st.away.poss,v=>Math.round(v)+"%")}${row("s_saves",st.home.saves,st.away.saves)}</div></section>
-  <nav class="tabs" role="tablist">${["recap","replay","ask","trust","table"].map(k=>`<button class="tab" role="tab" data-tab="${k}" aria-selected="${S.tab===k}">${esc(t(k==="table"?"table":"tab_"+k))}</button>`).join("")}</nav>
+  <nav class="tabs" role="tablist">${["recap","replay","ask","table","trust"].map(k=>`<button class="tab" role="tab" data-tab="${k}" aria-selected="${S.tab===k}">${esc(t(k==="table"?"table":k==="trust"?"tab_check":"tab_"+k))}</button>`).join("")}</nav>
   <main id="view"></main>
   <footer><span>${esc(t("synthetic"))}</span><span>${esc(t("footer"))} · build 16</span></footer>`;
   view()}
@@ -348,8 +350,18 @@ function viewRecap(){const en=EN(),m=M();const v=$("#view");
    <h2 class="headline">${esc(headline())}</h2>
    <div id="sents">${en.sentences.map((s,i)=>{const ids=recapIds(i);return`<button class="sent" data-r="${i}" aria-pressed="${S.sel&&S.sel.kind==="r"&&S.sel.i===i}"><p>${esc(sentText(i))}</p><span class="chips"><span class="chip ok">✓ ${esc(t("verified"))}</span>${ids.slice(0,2).map(n=>`<span class="chip">${esc(t("event_n",{n}))}</span>`).join("")}</span></button>`}).join("")}</div>
    <p class="note">${esc(t("tap_sentence"))}</p>${S.lang!=="en"?`<p class="note">${esc(t("mt_note"))}</p>`:""}
-   <details><summary>${esc(t("how_made",{d:st.drafted??en.sentences.length,b:bf,f:st.fixed??0,x:st.dropped??0}))}</summary><ul class="trace">${(en.trace||[]).map(x=>`<li><b>${esc(x.agent)}</b><span>${esc(x.event)}</span></li>`).join("")||`<li><span></span><span>${esc(t("checker_clean"))}</span></li>`}</ul></details></section>${pitchPanel()}</div>`}
+   <details><summary>${esc(t("how_made",{d:st.drafted??en.sentences.length,b:bf,f:st.fixed??0,x:st.dropped??0}))}</summary><ul class="trace">${(en.trace||[]).map(x=>`<li><b>${esc(x.agent)}</b><span>${esc(x.event)}</span></li>`).join("")||`<li><span></span><span>${esc(t("checker_clean"))}</span></li>`}</ul></details></section>${pitchPanel()}</div>${playerSection(m)}`}
 
+function playerRows(m){const {all}=evMap(m),P=new Map();
+  for(const e of all){if(!e.player)continue;const k=e.side+"|"+e.player;let r=P.get(k);if(!r){r={name:e.player,side:e.side,g:0,s:0,xg:0,p:0,pc:0,t:0,i:0,f:0,n:0};P.set(k,r)}
+    r.n++;if(e.type==="goal")r.g++;else if(e.type==="shot"){r.s++;r.xg+=e.xg||0}else if(e.type==="pass"){r.p++;if(e.outcome==="complete")r.pc++}else if(e.type==="tackle")r.t++;else if(e.type==="interception")r.i++;else if(e.type==="foul")r.f++}
+  return[...P.values()]}
+function playerSection(m){const rows=playerRows(m).filter(r=>r.side===S.plSide).sort((a,b)=>b.g-a.g||b.n-a.n);
+  return`<section class="blk c-white" style="margin-top:var(--gap)"><div class="eyebrow">${esc(t("pl_title"))}</div>
+   <div class="ctrl"><div class="seg" role="group" aria-label="${esc(t("pl_title"))}">${["home","away"].map(sd=>`<button data-pl="${sd}" aria-pressed="${S.plSide===sd}">${esc(sd==="home"?m.home:m.away)}</button>`).join("")}</div></div>
+   <div class="ptw"><table class="pt"><tr><th>${esc(t("th_player"))}</th>${["pl_goals","s_shots","s_xg","pl_passes","pl_acc","pl_tackles","pl_int","s_fouls"].map(k=>`<th>${esc(t(k))}</th>`).join("")}</tr>
+   ${rows.map(r=>`<tr><td>${esc(r.name)}</td><td>${r.g}</td><td>${r.s}</td><td>${r.xg.toFixed(2)}</td><td>${r.p}</td><td>${r.p?Math.round(100*r.pc/r.p)+"%":"–"}</td><td>${r.t}</td><td>${r.i}</td><td>${r.f}</td></tr>`).join("")}</table></div>
+   <p class="note">${esc(t("pl_note"))}</p></section>`}
 /* ---------- replay ---------- */
 function stop(){S.playing=false;clearInterval(S.timer)}
 function xgSeries(m){const {all}=evMap(m),ser={home:[0],away:[0]},sh=all.filter(e=>e.type==="shot"||e.type==="goal");
@@ -383,7 +395,7 @@ function replayPitch(m,tt){const ce=curEv(m,tt);
   return s+"</svg>"}
 function draw(){if(S.tab!=="replay"||!$("#clk"))return;const tt=S.t,m=M(),{all}=evMap(m);
   $("#rpv").innerHTML=replayPitch(m,tt);
-  const goals=all.filter(e=>e.type==="goal"&&e.t<=tt),h=goals.filter(e=>e.side==="home").length,a=goals.length-h;
+  const goals=all.filter(e=>e.type==="goal"&&dm(e)<=tt),h=goals.filter(e=>e.side==="home").length,a=goals.length-h;
   $("#clk").textContent=Math.floor(tt)+"'";$("#sb").textContent=`${h}–${a}`;
   $("#xg").innerHTML=xgChart(m,tt);$("#sc").value=tt;$("#pl").textContent=S.playing?t("pause"):(tt>=95.9?t("restart"):t("play"));
   $("#nowcap").innerHTML=nowLine(m,tt);
@@ -395,16 +407,52 @@ function nowText(m,e){const team=e.side==="home"?m.home:m.away,o={player:e.playe
   if(e.type==="pass"){if(e.outcome!=="complete")return t("nw_pass_miss",o);if(e.end_x==null)return t("nw_pass_side",{...o,m:0});const dx=e.end_x-e.x,dy=e.end_y-e.y,d=Math.round(Math.hypot(dx*1.05,dy*.68));return t(dx>4?"nw_pass_fwd":dx<-4?"nw_pass_back":"nw_pass_side",{...o,m:d})}
   const k={dribble:"nw_dribble",interception:"nw_interception",tackle:"nw_tackle",duel:"nw_duel",pressure:"nw_pressure",shot:"nw_shot_"+(e.outcome||"off_target"),save:"nw_save",foul:"nw_foul",free_kick:"nw_free_kick",corner:"nw_corner",goal_kick:"nw_goal_kick",block:"nw_block",yellow_card:"nw_yellow_card",goal:"nw_goal",substitution:"nw_sub"}[e.type];
   return k?t(k,o):""}
-function curEv(m,tt){const {all}=evMap(m);for(let i=all.length-1;i>=0;i--){const x=all[i];if(x.t<=tt&&x.player&&x.type!=="half_time"&&x.type!=="full_time")return x}return null}
+const dm=e=>Math.floor(e.t)+1;
+function curEv(m,tt){const {all}=evMap(m);for(let i=all.length-1;i>=0;i--){const x=all[i];if(dm(x)<=tt&&x.player&&x.type!=="half_time"&&x.type!=="full_time")return x}return null}
 function nowLine(m,tt){const e=curEv(m,tt);
-  if(!e)return`<b>0'</b>${esc(t("kickoff"))}`;const txt=nowText(m,e);return txt?`<b>${Math.floor(e.t)}'</b>${esc(txt)}`:""}
+  if(!e)return`<b>0'</b>${esc(t("kickoff"))}`;const txt=nowText(m,e);return txt?`<b>${dm(e)}'</b>${esc(txt)}`:""}
 function feedItems(m,tt){const {all}=evMap(m),cov=new Set();m.timeline.forEach(x=>(x.events||[]).forEach(i=>cov.add(i)));
   const it=m.timeline.filter(x=>x.minute<=tt+.01).map(x=>({minute:x.minute,goal:x.kind==="goal",kind:kindName(x),text:timelineText(x)}));
-  for(const e of all){if(e.t>tt+.01||cov.has(e.id))continue;const team=e.side==="home"?m.home:m.away,o={player:e.player||"",team};
-    if(e.type==="shot"&&e.outcome!=="goal")it.push({minute:Math.floor(e.t),kind:t("fd_shot_kind"),text:t("fd_shot_"+e.outcome,o)});
-    else if(e.type==="foul")it.push({minute:Math.floor(e.t),kind:t("fd_foul_kind"),text:t("fd_foul",o)});
-    else if(e.type==="corner")it.push({minute:Math.floor(e.t),kind:t("fd_corner_kind"),text:t("fd_corner",o)})}
+  for(const e of all){if(dm(e)>tt+.01||cov.has(e.id))continue;const team=e.side==="home"?m.home:m.away,o={player:e.player||"",team};
+    if(e.type==="shot"&&e.outcome!=="goal")it.push({minute:dm(e),kind:t("fd_shot_kind"),text:t("fd_shot_"+e.outcome,o)});
+    else if(e.type==="foul")it.push({minute:dm(e),kind:t("fd_foul_kind"),text:t("fd_foul",o)});
+    else if(e.type==="corner")it.push({minute:dm(e),kind:t("fd_corner_kind"),text:t("fd_corner",o)})}
   it.sort((a,b)=>b.minute-a.minute);return it}
+/* ---------- ask: typed questions are matched by rules to lookups over the event log (no model call) ---------- */
+const STATRX=[["shots",/\bshots?\b|\bshoot|\bshot\b/],["goals",/\bgoals?\b|\bscor/],["passes",/\bpass/],["tackles",/\btackl/],["interceptions",/\bintercept/],["fouls",/\bfouls?\b|\bfouled\b/],["yellow_cards",/yellow|\bcards?\b|\bbooked\b/],["corners",/\bcorners?\b/],["saves",/\bsaves?\b|\bsaved\b/],["dribbles",/dribbl/],["duels",/\bduels?\b/],["pressures",/pressur/]];
+const STYPE={shots:["shot"],goals:["goal"],passes:["pass"],tackles:["tackle"],interceptions:["interception"],fouls:["foul"],yellow_cards:["yellow_card"],corners:["corner"],saves:["save"],dribbles:["dribble"],duels:["duel"],pressures:["pressure"]};
+const NOTLOG=/how long|out for|referee|\bref\b|manager|coach|tactic|tired|fatigue|speed|\bfast|\bkm\b|distance|transfer|next (match|game)|will win|bayern|real madrid|barcelona|liverpool|arsenal|chelsea|tottenham|united|should have|was .* right|opinion|think/;
+function askCannot(why){return{status:"cannot_tell",answer:t("ab_cannot",{why}),sentences:[],trace:[{agent:"Planner",event:t("ab_trace")}]}}
+function askPlayers(m){const {all}=evMap(m),P=new Map();all.forEach(e=>{if(e.player&&!P.has(e.player))P.set(e.player,e.side)});return[...P.entries()].map(([n,sd])=>({name:n,side:sd}))}
+function askLocal(q){const m=M(),{all}=evMap(m),ql=q.toLowerCase(),tn=sd=>sd==="home"?m.home:m.away;
+  if(NOTLOG.test(ql))return askCannot(t("ab_why_log"));
+  const homeNamed=ql.includes(m.home.toLowerCase())||ql.includes(m.home.split(" ")[0].toLowerCase())||/\bhome\b/.test(ql),awayNamed=ql.includes(m.away.toLowerCase())||ql.includes(m.away.split(" ")[0].toLowerCase())||/\b(away|visitors?)\b/.test(ql);
+  const pls=askPlayers(m).filter(p=>ql.includes(p.name.toLowerCase())||new RegExp("\\b"+p.name.split(" ").slice(-1)[0].toLowerCase()+"\\b").test(ql)),full=pls.filter(p=>ql.includes(p.name.toLowerCase())),pl=full.length===1?full[0]:pls.length===1?pls[0]:null;
+  const hit=(sd,type,f)=>all.filter(e=>e.side===sd&&STYPE[type].includes(e.type)&&f(e)),res=(texts,ids)=>({status:"answered",sentences:texts.map((x,i)=>({text:x,receipts:ids[i]||[]})),answer:texts.join(" "),trace:[{agent:"Planner",event:t("ab_trace")}]});
+  if(/\bwho\b.*\bscor|\bscorers?\b|\bwhen\b.*\b(goal|scor)/.test(ql)){const g=all.filter(e=>e.type==="goal");if(!g.length)return res([t("ab_nogoals")],[[]]);
+    const sc={home:0,away:0};return res([t("ab_goals",{list:g.map(e=>{sc[e.side]++;return t("ab_goal_item",{player:e.player,team:tn(e.side),m:dm(e),sc:sc.home+"-"+sc.away})}).join("; ")})],[g.map(e=>e.id)])}
+  if(pls.length>1&&!pl)return{status:"cannot_tell",answer:t("ab_several",{list:pls.map(p=>p.name+" ("+tn(p.side)+")").join(", ")}),sentences:[],trace:[{agent:"Planner",event:t("ab_trace")}]};
+  let st=null;for(const[k,rx]of STATRX)if(rx.test(ql)){st=k;break}
+  if(/\binjur/.test(ql))return{stored:7};
+  if(/formation|\bshape\b/.test(ql)&&!(homeNamed&&!awayNamed))return{stored:8};
+  if(/\bwhy\b|deserv|unlucky|lucky|how did the result/.test(ql))return{stored:1};
+  if(/\brated\b|rating|best player|man of the match|\bmvp\b/.test(ql))return{stored:2};
+  let lo=null,hi=null,win="";
+  if(/first half|1st half/.test(ql)){hi=45;win=t("ab_h1")}else if(/second half|2nd half/.test(ql)){lo=46;win=t("ab_h2")}
+  else{const mm=ql.match(/(?:minutes?|between)\s*(\d+)\s*(?:and|-|to)\s*(\d+)/);if(mm){lo=+mm[1];hi=+mm[2];win=t("ab_win",{a:lo,b:hi})}}
+  const inw=e=>(lo==null||dm(e)>=lo)&&(hi==null||dm(e)<=hi),sname=t("st_"+st),one=(n,x)=>S.lang==="en"&&n===1?x.replace(/sses$/,"ss").replace(/s$/,""):x;
+  if(pl){const mine=all.filter(e=>e.player===pl.name),c=ty=>mine.filter(e=>e.type===ty),ids=a=>a.map(e=>e.id).slice(0,15);
+    if(st==="shots"&&/expected|xg|chance quality/.test(ql)){const sh=c("shot");return res([t("ab_pxg",{player:pl.name,team:tn(pl.side),s:sh.length,x:sh.reduce((a,e)=>a+(e.xg||0),0).toFixed(2)})],[ids(sh)])}
+    if(st){const h=mine.filter(e=>STYPE[st].includes(e.type)&&inw(e));return res([t("ab_pstat",{player:pl.name,team:tn(pl.side),n:h.length,stat:one(h.length,sname)}).replace(/\.$/,win+".")],[ids(h)])}
+    return res([t("ab_psum",{player:pl.name,team:tn(pl.side),g:c("goal").length,s:c("shot").length,p:c("pass").length,t:c("tackle").length,i:c("interception").length,f:c("foul").length})],[ids(mine.filter(e=>["goal","shot","tackle","interception","foul"].includes(e.type)))])}
+  if(!st)return null;
+  if(/\bmost\b|\bwho\b|which player|\btop\b/.test(ql)&&!(homeNamed||awayNamed)){const c=new Map();all.filter(e=>STYPE[st].includes(e.type)&&e.player&&inw(e)).forEach(e=>c.set(e.player,(c.get(e.player)||0)+1));
+    if(!c.size)return res([t("ab_none",{stat:sname})],[[]]);const top=[...c.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])),cut=top[Math.min(3,top.length)-1][1],sel=top.filter(x=>x[1]>=cut).slice(0,3),names=new Set(sel.map(x=>x[0]));
+    return res([t("ab_top",{stat:sname,list:sel.map(x=>x[0]+" "+x[1]).join(", ")})],[all.filter(e=>STYPE[st].includes(e.type)&&names.has(e.player)).map(e=>e.id).slice(0,15)])}
+  const sides=homeNamed&&!awayNamed?["home"]:awayNamed&&!homeNamed?["away"]:["home","away"],out=[],ids=[];
+  sides.forEach(sd=>{const h=hit(sd,st,inw);out.push(t("ab_team_stat",{team:tn(sd),n:h.length,stat:one(h.length,sname),win}));ids.push(h.map(e=>e.id).slice(0,15))});return res(out,ids)}
+function askExamples(){const m=M(),{all}=evMap(m),c=new Map();all.filter(e=>e.type==="pass"&&e.player).forEach(e=>c.set(e.player,(c.get(e.player)||0)+1));const top=[...c.entries()].sort((a,b)=>b[1]-a[1])[0];
+  return[`How many shots did ${m.home} have in the second half?`,`How many corners did ${m.away} have?`,`Who had the most passes?`,top?`What did ${top[0]} do in this match?`:`Who had the most tackles?`,`How many yellow cards did ${m.home} get?`]}
 /* ---------- ask ---------- */
 let stepTimer=null;
 function viewAsk(){const en=EN();let body="";
@@ -415,15 +463,18 @@ function viewAsk(){const en=EN();let body="";
     body=`<div class="answer ${ok?"ok":"no"}"><div class="eyebrow">${esc(ok?t("ask_answered"):t("ask_cannot"))}</div>${askSents(S.q).map((s,i)=>`<button class="sent" data-a="${i}" aria-pressed="${S.sel&&S.sel.kind==="a"&&S.sel.i===i}"><p>${esc(s.text)}</p>${s.ids.length?`<span class="chips"><span class="chip ok">✓ ${esc(t("verified"))}</span>${s.ids.slice(0,2).map(n=>`<span class="chip">${esc(t("event_n",{n}))}</span>`).join("")}</span>`:""}</button>`).join("")}${traceBlock(e.trace)}</div>`}
   $("#view").innerHTML=`<div class="grid"><section class="blk c-white"><div class="eyebrow">${esc(t("ask_title"))}</div>
    <form class="ask" id="af"><input id="qi" aria-label="${esc(t("ask_placeholder"))}" placeholder="${esc(t("ask_placeholder"))}" maxlength="200" autocomplete="off"><button class="go" ${S.busy2?"disabled":""}>${esc(t("ask_btn"))}</button></form>
-   <p class="note" style="margin-top:6px">${esc(t("ask_live"))}</p>
-   <div class="qs">${Array.from({length:11},(_,i)=>`<button class="q" data-q="${i}" aria-pressed="${S.q===i&&!S.live}">${esc(t("q"+i))}</button>`).join("")}</div>
+   <p class="note" style="margin-top:6px">${esc(t(S.cfg.live_url?"ask_live":"ask_free"))}</p>
+   <div class="qs">${Array.from({length:11},(_,i)=>`<button class="q" data-q="${i}" aria-pressed="${S.q===i&&!S.live}">${esc(t("q"+i))}</button>`).join("")}</div><p class="note" style="margin:10px 0 6px">${esc(t("ab_hint"))}</p><div class="qs" lang="en" dir="ltr">${askExamples().map((x,i)=>`<button class="q" data-ex="${i}">${esc(x)}</button>`).join("")}</div>
    <p class="note" style="margin-top:0">${esc(t("ask_stored"))}</p>${body}</section>${pitchPanel()}</div>`;
   if(S.busy2)startSteps()}
 function traceBlock(tr){return tr&&tr.length?`<details><summary>${esc(t("ask_trace"))}</summary><ul class="trace">${tr.map(x=>`<li><b>${esc(x.agent)}</b><span>${esc(x.event)}</span></li>`).join("")}</ul></details>`:""}
 function fitRoll(){const r=$("#roll");if(r)r.style.setProperty("--w",r.clientWidth+"px")}
 function startSteps(){let i=0;clearInterval(stepTimer);const f=()=>{document.querySelectorAll("#steps span").forEach((s,k)=>{s.classList.toggle("on",k===i);s.classList.toggle("done",k<i)});if(i<4)i++};f();stepTimer=setInterval(f,2600);fitRoll()}
 async function liveAsk(q){const u=S.cfg.live_url;S.q=null;S.sel=null;
-  if(!u){S.live={err:"ask_live_off"};viewAsk();return}
+  const loc=askLocal(q);
+  if(loc&&loc.stored!=null){S.q=loc.stored;S.live=null;const a=askSents(S.q)[0];S.sel=a&&a.ids.length?{kind:"a",i:0,ids:a.ids}:null;viewAsk();return}
+  if(loc){S.live=loc;viewAsk();return}
+  if(!u){S.live=askCannot(t("ab_why_nomatch"));viewAsk();return}
   S.busy2=true;S.live=null;viewAsk();
   try{const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),60000);
     const r=await fetch(u,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({match_id:S.mid,question:q,lang:S.lang}),signal:ctl.signal});clearTimeout(to);
@@ -446,10 +497,10 @@ function viewTrust(){const sc=S.score,en=EN();let a="";
    <div class="stats"><div class="stat" style="background:var(--lime)"><b>${pct}%</b><span>${esc(t("tr_pct",{a:sc.caught,b:sc.planted_errors}))}</span></div><div class="stat" style="background:var(--sky)"><b>${sc.wrongly_blocked} / ${sc.true_sentences}</b><span>${esc(t("tr_wrongly"))}</span></div></div>
    <div class="eyebrow">${esc(t("tr_kinds"))}</div><div class="rows">${Object.entries(sc.by_kind||{}).map(([k,v])=>`<div class="rw"><span>${esc(t("k_"+k))}</span><div class="bar"><i style="width:${v[1]?100*v[0]/v[1]:0}%"></i></div><span>${v[0]}/${v[1]}</span></div>`).join("")}</div>
    <p class="note">${esc(t("tr_sub",{n:sc.matches,model:sc.model}))}</p><p class="note">${esc(t("tr_data"))}</p></section>`}
-  const ag=`<section class="blk c-pale"><div class="eyebrow">${esc(t("ag_title"))}</div><ol class="agents">${[1,2,3,4,5].map(i=>`<li><b>${esc(t("ag"+i+"n"))}</b><span>${esc(t("ag"+i+"d"))}</span></li>`).join("")}</ol></section>`;
+  const ag=`<section class="blk c-white"><div class="eyebrow">${esc(t("ag_title"))}</div><ol class="agents">${[1,2,3,4,5].map(i=>`<li><b>${esc(t("ag"+i+"n"))}</b><span>${esc(t("ag"+i+"d"))}</span></li>`).join("")}</ol></section>`;
   let tr="";
   if(en&&en.sentences){const sents=en.sentences,i=Math.min(S.tryIdx,sents.length-1);if(S.tryText==null)S.tryText=sents[i].text;
-    tr=`<section class="blk c-amber" style="margin-top:var(--gap)"><div class="eyebrow">${esc(t("try_title"))}</div><h2 class="headline" style="font-size:clamp(18px,2.4vw,26px)">${esc(t("try_h"))}</h2>
+    tr=`<section class="blk c-white" style="margin-top:var(--gap)"><div class="eyebrow">${esc(t("try_title"))}</div><h2 class="headline" style="font-size:clamp(18px,2.4vw,26px)">${esc(t("try_h"))}</h2>
     <div class="ctrl"><select class="sel" id="ts" aria-label="${esc(t("try_h"))}">${sents.map((s,k)=>`<option value="${k}" ${k===i?"selected":""}>${esc(s.text.slice(0,70))}</option>`).join("")}</select>
     <button class="ghost" id="b1">${esc(t("try_num"))}</button><button class="ghost" id="b2">${esc(t("try_swap"))}</button><button class="ghost" id="b3">${esc(t("try_cause"))}</button><button class="ghost" id="b4">${esc(t("try_reset"))}</button></div>
     <textarea id="tt" rows="3" lang="en" dir="ltr">${esc(S.tryText)}</textarea><p class="note">${esc(t("try_note"))}</p><div id="tv"></div></section>`}
@@ -477,6 +528,8 @@ document.addEventListener("click",e=>{const g=a=>e.target.closest("["+a+"]");let
   if(el=g("data-r")){const i=+el.dataset.r;pick({kind:"r",i,ids:recapIds(i)});return}
   if(el=g("data-a")){const i=+el.dataset.a;pick({kind:"a",i,ids:askSents(S.q)[i].ids});return}
   if(el=g("data-l")){const i=+el.dataset.l,s=(S.live.sentences||[])[i];pick({kind:"l",i,ids:(s&&s.receipts)||[]});return}
+  if(el=g("data-ex")){const q=askExamples()[+el.dataset.ex];liveAsk(q);return}
+  if(el=g("data-pl")){S.plSide=el.dataset.pl;viewRecap();return}
   if(el=g("data-q")){S.q=+el.dataset.q;S.live=null;const a=askSents(S.q)[0];S.sel=a&&a.ids.length?{kind:"a",i:0,ids:a.ids}:null;S.mom=0;viewAsk();return}
   if(el=g("data-seek")){S.t=+el.dataset.seek;draw();return}
   if(e.target.id==="th"){const h=document.documentElement;h.dataset.mode=h.dataset.mode==="dark"?"light":"dark";store.set("md_mode",h.dataset.mode);shell()}});
@@ -488,7 +541,7 @@ addEventListener("resize",fitRoll);
 /* ---------- start ---------- */
 (async()=>{try{
   const mode=store.get("md_mode");if(mode==="light"||mode==="dark")document.documentElement.dataset.mode=mode;
-  const [season,uiEn,cfg,score]=await Promise.all([J(DATA+"season.json"),J(DATA+"ui/en.json"),J(DATA+"config.json").catch(()=>({})),J(DATA+"scorecard.json").catch(()=>null)]);
+  const [season,uiEn,cfg,score,patch]=await Promise.all([J(DATA+"season.json"),J(DATA+"ui/en.json"),J(DATA+"config.json").catch(()=>({})),J(DATA+"scorecard.json").catch(()=>null),J(DATA+"ui_patch.json").catch(()=>({}))]);S.patch=patch;
   if(Array.isArray(cfg.weeks)&&cfg.weeks.length)season.weeks=season.weeks.filter(w=>cfg.weeks.includes(w.n));
   if(Array.isArray(cfg.langs)&&cfg.langs.length){const keep=LANGS.filter(l=>cfg.langs.includes(l[0]));LANGS.splice(0,LANGS.length,...keep)}
   S.season=season;S.uiEn=uiEn;S.ui=uiEn;S.cfg=cfg;S.score=score;S.mw=season.weeks[0].n;
