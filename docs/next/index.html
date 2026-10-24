@@ -173,6 +173,11 @@ html:not([data-mode="light"]) .c-white th,html:not([data-mode="light"]) .c-white
 html:not([data-mode="light"]) .c-white .sent,html:not([data-mode="light"]) .c-white .q,html:not([data-mode="light"]) .c-white .feed li,html:not([data-mode="light"]) .c-white .agents li,html:not([data-mode="light"]) .c-white .stat{border-color:#3a3d40}
 html:not([data-mode="light"]) .c-white .sent[aria-pressed="true"] .chip,html:not([data-mode="light"]) .c-white .q[aria-pressed="true"] .chip{background:#0B0B0C;color:#fff}html:not([data-mode="light"]) .c-white .sent[aria-pressed="true"] .chip.ok{background:#0B0B0C;color:var(--lime);border-color:#0B0B0C}
 html:not([data-mode="light"]) .c-white .stat{--ink:#0B0B0C;color:#0B0B0C;border-color:#0B0B0C}html:not([data-mode="light"]) .c-white tr.hl td{color:#0B0B0C}
+html[data-mode="light"] .board.c-lime{background:#fff;color:#0B0B0C;border-color:#0B0B0C}
+html[data-mode="light"] .board .num{color:#0B0B0C}html[data-mode="light"] .board small{color:#0B0B0C;opacity:.7}
+html[data-mode="light"] .board .bar{background:#0B0B0C1f}html[data-mode="light"] .board .bar.l i{background:#0B0B0C}html[data-mode="light"] .board .bar.r i{background:#fff;box-shadow:inset 0 0 0 2px #0B0B0C}
+html[data-mode="light"] .board .tr b,html[data-mode="light"] .board .tr span{color:#0B0B0C}
+html[data-mode="light"] .board .bdg{border-color:#0B0B0C}
 .nowcap{padding:10px 14px;font:700 13px/1.35 var(--body);background:#0B0B0C;color:#fff;border-top:1px solid #ffffff22;min-height:3.2em;direction:auto}.nowcap b{font:var(--dw) 16px var(--disp);margin-inline-end:8px;color:var(--lime)}
 </style>
 </head>
@@ -367,16 +372,16 @@ function viewReplay(){const m=M();$("#view").innerHTML=`<div class="grid"><secti
   draw()}
 function play(){if(S.t>=95.9)S.t=0;S.playing=true;clearInterval(S.timer);S.timer=setInterval(()=>{S.t=Math.min(96,S.t+.1*S.speed);if(S.t>=96)stop();draw()},50)}
 function replayPitch(m,tt){const {all}=evMap(m);
-  const win=all.filter(e=>e.t<=tt&&e.t>tt-6&&e.x!=null);
+  const win=all.filter(e=>e.t<=tt&&e.t>tt-6&&e.x!=null),WIN={shot:2,goal:4,yellow_card:3,injury_stoppage:3};
   let s=`<svg class="pitchsvg" viewBox="-2 -2 109 72" role="img" aria-label="${esc(t("last_min"))}">${DEFS}<rect x="-10" y="-10" width="130" height="90" fill="#17643B"/>${lines()}`;
   win.filter(e=>e.type==="pass"&&e.end_x!=null&&e.t>tt-.5).forEach(e=>{const o=.2+.7*(1-(tt-e.t)/.5);s+=`<path d="M${GX(e).toFixed(1)} ${GY(e).toFixed(1)}L${GEX(e).toFixed(1)} ${GEY(e).toFixed(1)}" stroke="#fff" stroke-opacity="${o.toFixed(2)}" stroke-width=".3" marker-end="url(#ah)" fill="none"/>`});
-  win.filter(e=>["shot","goal","yellow_card","injury_stoppage"].includes(e.type)).forEach(e=>{const x=GX(e),y=GY(e),c=TEAMC(e.side),age=1-(tt-e.t)/6;
+  win.filter(e=>WIN[e.type]&&e.t>tt-WIN[e.type]).forEach(e=>{const x=GX(e),y=GY(e),c=TEAMC(e.side),age=1-(tt-e.t)/WIN[e.type];
     if(e.type==="goal")s+=`<circle cx="${x}" cy="${y}" r="2.1" fill="${c}" stroke="#0B0B0C" stroke-width=".3"/><circle cx="${x}" cy="${y}" r="3.4" fill="none" stroke="#fff" stroke-width=".3"/>`;
     else if(e.type==="shot")s+=`<circle cx="${x}" cy="${y}" r="${(.8+2.6*Math.sqrt(e.xg||.05)).toFixed(2)}" fill="${c}" fill-opacity="${(.35+.5*age).toFixed(2)}" stroke="#0B0B0C" stroke-width=".2"/>`;
     else if(e.type==="yellow_card")s+=`<rect x="${x-.8}" y="${y-1.2}" width="1.6" height="2.4" fill="#FFC24B" stroke="#0B0B0C" stroke-width=".2"/>`;
     else if(e.type==="injury_stoppage")s+=`<path d="M${x-1.3} ${y}H${x+1.3}M${x} ${y-1.3}V${y+1.3}" stroke="#FF7A5C" stroke-width=".9" stroke-linecap="round"/>`;
     else s+=`<rect x="${x-.8}" y="${y-.8}" width="1.6" height="1.6" fill="${c}" stroke="#0B0B0C" stroke-width=".2"/>`});
-  win.filter(e=>["shot","goal","yellow_card","injury_stoppage"].includes(e.type)&&e.t>tt-3&&!(e.type==="shot"&&e.outcome==="goal")).slice(-4).forEach(e=>{const x=GX(e),y=GY(e),an=x>92?"end":x<12?"start":"middle";
+  win.filter(e=>WIN[e.type]&&e.t>tt-Math.min(2,WIN[e.type])&&!(e.type==="shot"&&e.outcome==="goal")).slice(-4).forEach(e=>{const x=GX(e),y=GY(e),an=x>92?"end":x<12?"start":"middle";
     s+=`<text x="${(x+(an==="end"?-1.8:an==="start"?1.8:0)).toFixed(1)}" y="${(y<7?y+4.4:y-2.6).toFixed(1)}" font-family="Figtree,sans-serif" font-weight="800" font-size="1.8" text-anchor="${an}" fill="#fff" stroke="#0B0B0C" stroke-width=".34" paint-order="stroke">${esc(sur(e.player))}</text>`});
   const ce=curEv(m,tt);if(ce&&ce.x!=null&&!["shot","goal","yellow_card","injury_stoppage"].includes(ce.type)){const x=GX(ce),y=GY(ce),c=TEAMC(ce.side),an=x>92?"end":x<12?"start":"middle";
     s+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.5" fill="${c}" stroke="#fff" stroke-width=".35"/><text x="${(x+(an==="end"?-2.2:an==="start"?2.2:0)).toFixed(1)}" y="${(y<7?y+4.6:y-2.6).toFixed(1)}" font-family="Figtree,sans-serif" font-weight="800" font-size="1.8" text-anchor="${an}" fill="#fff" stroke="#0B0B0C" stroke-width=".34" paint-order="stroke">${esc(sur(ce.player))}</text>`}
