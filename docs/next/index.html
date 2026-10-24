@@ -372,16 +372,16 @@ function viewReplay(){const m=M();$("#view").innerHTML=`<div class="grid"><secti
   draw()}
 function play(){if(S.t>=95.9)S.t=0;S.playing=true;clearInterval(S.timer);S.timer=setInterval(()=>{S.t=Math.min(96,S.t+.1*S.speed);if(S.t>=96)stop();draw()},50)}
 function replayPitch(m,tt){const {all}=evMap(m);
-  const win=all.filter(e=>e.t<=tt&&e.t>tt-6&&e.x!=null),WIN={shot:2,goal:4,yellow_card:3,injury_stoppage:3};
+  const win=all.filter(e=>e.t<=tt&&e.t>tt-2&&e.x!=null),WIN={shot:.6,goal:2,yellow_card:.6,injury_stoppage:.6};
   let s=`<svg class="pitchsvg" viewBox="-2 -2 109 72" role="img" aria-label="${esc(t("last_min"))}">${DEFS}<rect x="-10" y="-10" width="130" height="90" fill="#17643B"/>${lines()}`;
-  win.filter(e=>e.type==="pass"&&e.end_x!=null&&e.t>tt-.5).forEach(e=>{const o=.2+.7*(1-(tt-e.t)/.5);s+=`<path d="M${GX(e).toFixed(1)} ${GY(e).toFixed(1)}L${GEX(e).toFixed(1)} ${GEY(e).toFixed(1)}" stroke="#fff" stroke-opacity="${o.toFixed(2)}" stroke-width=".3" marker-end="url(#ah)" fill="none"/>`});
+  {const pe=curEv(m,tt);if(pe&&pe.type==="pass"&&pe.end_x!=null)s+=`<path d="M${GX(pe).toFixed(1)} ${GY(pe).toFixed(1)}L${GEX(pe).toFixed(1)} ${GEY(pe).toFixed(1)}" stroke="#fff" stroke-opacity=".9" stroke-width=".35" marker-end="url(#ah)" fill="none"/>`}
   win.filter(e=>WIN[e.type]&&e.t>tt-WIN[e.type]).forEach(e=>{const x=GX(e),y=GY(e),c=TEAMC(e.side),age=1-(tt-e.t)/WIN[e.type];
     if(e.type==="goal")s+=`<circle cx="${x}" cy="${y}" r="2.1" fill="${c}" stroke="#0B0B0C" stroke-width=".3"/><circle cx="${x}" cy="${y}" r="3.4" fill="none" stroke="#fff" stroke-width=".3"/>`;
     else if(e.type==="shot")s+=`<circle cx="${x}" cy="${y}" r="${(.8+2.6*Math.sqrt(e.xg||.05)).toFixed(2)}" fill="${c}" fill-opacity="${(.35+.5*age).toFixed(2)}" stroke="#0B0B0C" stroke-width=".2"/>`;
     else if(e.type==="yellow_card")s+=`<rect x="${x-.8}" y="${y-1.2}" width="1.6" height="2.4" fill="#FFC24B" stroke="#0B0B0C" stroke-width=".2"/>`;
     else if(e.type==="injury_stoppage")s+=`<path d="M${x-1.3} ${y}H${x+1.3}M${x} ${y-1.3}V${y+1.3}" stroke="#FF7A5C" stroke-width=".9" stroke-linecap="round"/>`;
     else s+=`<rect x="${x-.8}" y="${y-.8}" width="1.6" height="1.6" fill="${c}" stroke="#0B0B0C" stroke-width=".2"/>`});
-  win.filter(e=>WIN[e.type]&&e.t>tt-Math.min(2,WIN[e.type])&&!(e.type==="shot"&&e.outcome==="goal")).slice(-4).forEach(e=>{const x=GX(e),y=GY(e),an=x>92?"end":x<12?"start":"middle";
+  win.filter(e=>WIN[e.type]&&e.t>tt-.6&&!(e.type==="shot"&&e.outcome==="goal")).slice(-1).forEach(e=>{const x=GX(e),y=GY(e),an=x>92?"end":x<12?"start":"middle";
     s+=`<text x="${(x+(an==="end"?-1.8:an==="start"?1.8:0)).toFixed(1)}" y="${(y<7?y+4.4:y-2.6).toFixed(1)}" font-family="Figtree,sans-serif" font-weight="800" font-size="1.8" text-anchor="${an}" fill="#fff" stroke="#0B0B0C" stroke-width=".34" paint-order="stroke">${esc(sur(e.player))}</text>`});
   const ce=curEv(m,tt);if(ce&&ce.x!=null&&!["shot","goal","yellow_card","injury_stoppage"].includes(ce.type)){const x=GX(ce),y=GY(ce),c=TEAMC(ce.side),an=x>92?"end":x<12?"start":"middle";
     s+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.5" fill="${c}" stroke="#fff" stroke-width=".35"/><text x="${(x+(an==="end"?-2.2:an==="start"?2.2:0)).toFixed(1)}" y="${(y<7?y+4.6:y-2.6).toFixed(1)}" font-family="Figtree,sans-serif" font-weight="800" font-size="1.8" text-anchor="${an}" fill="#fff" stroke="#0B0B0C" stroke-width=".34" paint-order="stroke">${esc(sur(ce.player))}</text>`}

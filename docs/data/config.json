@@ -1,1 +1,15 @@
-{"live_url":""}
+{
+ "live_url": "",
+ "weeks": [
+  1
+ ],
+ "langs": [
+  "en",
+  "de",
+  "es",
+  "fr",
+  "it",
+  "pt",
+  "ar"
+ ]
+}
