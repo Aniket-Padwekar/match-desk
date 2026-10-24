@@ -326,7 +326,7 @@ function shell(){stop();const app=$("#app");
    <div class="tape">${row("s_shots",st.home.shots,st.away.shots)}${row("s_xg",st.home.xg,st.away.xg,v=>v.toFixed(2))}${row("s_poss",st.home.poss,st.away.poss,v=>Math.round(v)+"%")}${row("s_saves",st.home.saves,st.away.saves)}</div></section>
   <nav class="tabs" role="tablist">${["recap","replay","ask","trust","table"].map(k=>`<button class="tab" role="tab" data-tab="${k}" aria-selected="${S.tab===k}">${esc(t(k==="table"?"table":"tab_"+k))}</button>`).join("")}</nav>
   <main id="view"></main>
-  <footer><span>${esc(t("synthetic"))}</span><span>${esc(t("footer"))} · build 15</span></footer>`;
+  <footer><span>${esc(t("synthetic"))}</span><span>${esc(t("footer"))} · build 16</span></footer>`;
   view()}
 function view(){const v={recap:viewRecap,replay:viewReplay,ask:viewAsk,trust:viewTrust,table:viewTable}[S.tab];v();fitRoll()}
 function autoSel(){const m=M(),en=EN();S.sel=null;S.mom=0;if(!m||!en||!en.sentences)return;
@@ -376,9 +376,8 @@ function replayPitch(m,tt){const ce=curEv(m,tt);
   if(!ce||ce.x==null)return s+"</svg>";
   const x=GX(ce),y=GY(ce),c=TEAMC(ce.side);
   if(ce.type==="pass"&&ce.end_x!=null)s+=`<path d="M${x.toFixed(1)} ${y.toFixed(1)}L${GEX(ce).toFixed(1)} ${GEY(ce).toFixed(1)}" stroke="#fff" stroke-opacity=".9" stroke-width=".35" marker-end="url(#ah)" fill="none"/>`;
-  const r=ce.type==="shot"?(1.5+2.2*Math.sqrt(ce.xg||.05)):ce.type==="goal"?2.1:1.5;
-  s+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.toFixed(2)}" fill="${c}" stroke="${ce.type==="goal"?"#0B0B0C":"#fff"}" stroke-width=".35"/>`;
-  if(ce.type==="goal")s+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.6" fill="none" stroke="#fff" stroke-width=".3"/>`;
+  if(ce.type==="goal"||(ce.type==="shot"&&ce.outcome==="goal"))s+=`<path d="M${x.toFixed(1)} ${y.toFixed(1)}L105 34" stroke="#fff" stroke-opacity=".9" stroke-width=".35" marker-end="url(#ah)" fill="none"/>`;
+  s+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.5" fill="${c}" stroke="#fff" stroke-width=".35"/>`;
   const an=x>92?"end":x<12?"start":"middle";
   s+=`<text x="${(x+(an==="end"?-2.4:an==="start"?2.4:0)).toFixed(1)}" y="${(y<7?y+5:y-3).toFixed(1)}" font-family="Figtree,sans-serif" font-weight="800" font-size="1.8" text-anchor="${an}" fill="#fff" stroke="#0B0B0C" stroke-width=".34" paint-order="stroke">${esc(sur(ce.player))}</text>`;
   return s+"</svg>"}
