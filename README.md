@@ -16,8 +16,8 @@ Recaps, match chats and AI commentary are only useful if people can trust them. 
 
 | Tab | What you get |
 |---|---|
-| **Recap** | A short match report. Every sentence is checked against the event log and links to its receipts; select a sentence to see the players and passes behind it on the pitch. Below it, a **Player data** table counted by code from the event log. |
-| **Replay** | Scrub or play the match. The pitch shows the one event the caption describes (who, where, and the pass or goal direction), next to a chance-quality line and a minute-by-minute feed. |
+| **Recap** | A short match report. Every sentence is checked against the event log and links to its receipts; select a sentence to see the players and passes behind it on the pitch. Below it, the **line-ups**: both teams on one pitch with ratings, cards, goals and substitutions. Click a player for his numbers, a heatmap of his touches and highlights, then browse the substitutes and the bench. Everything is counted by code from the event log; ratings come from the published rating formula. |
+| **Replay** | Scrub or play the match. One ball moves continuously along the real event positions with a fading trail, next to a caption of the current event, a chance-quality line and a feed. |
 | **Ask** | Eleven prepared questions that went through the full pipeline (planner, lookups, writer, checker, judge). You can also type your own question: it is matched by rules to a lookup over the event log, answered with receipts, or answered "cannot tell". No model is called for typed questions. |
 | **League table** | The table after matchweek 1. |
 | **How it's checked** | A measured scorecard (deliberately planted errors vs. what the checker caught), the five agents, and a box where you can edit a sentence and run the rule layer in your browser. |
@@ -75,7 +75,7 @@ Honest limits:
 
 - `python tests/check.py`: offline tests of the simulator, engine, checker and Ask lookups (no keys, no cost).
 - The recaps, prepared answers, translations and scorecard were generated on the real Azure `gpt-5-mini` deployment in Google Colab.
-- The website was checked in a browser with a scripted test (every minute of the replay shows at most one dot, one arrow and one name; typed questions return the expected answers). Not tested: a full accessibility audit, and phone layouts beyond a quick look.
+- The website was checked in a browser with a scripted test (every minute of the replay shows one ball with a trail and one name; typed questions return the expected answers; the line-up pop-up opens, steps through players and closes with Esc). Not tested: a full accessibility audit, and phone layouts beyond a quick look.
 
 ## Run it yourself
 
@@ -95,6 +95,7 @@ tracing.py         optional tracing to Azure Monitor (off by default, untested l
 ask.py             prepared Ask answers: lookups, planner, checked answers
 season.py          fictional league and fixtures
 build_season.py    builds the season and matchweek files from the simulator
+build_players.py   builds docs/data/players.json (line-ups, subs, bench, ratings) from the simulator
 season_run.py      model-written recaps, answers and translations for one matchweek
 translate.py       translation with number and name checks
 ui_en.py           interface labels (English source)

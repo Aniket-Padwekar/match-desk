@@ -8,8 +8,8 @@ Record the live site, one match open (Harbourside City 1-0 Redcliffe Athletic). 
 **0:12 (click the sentence about the goal)**
 "This is a recap written by a model on Microsoft Foundry. Click a sentence and the proof appears on the pitch: the goal, the player, the event number. Every sentence was re-checked from the raw events by code."
 
-**0:30 (scroll to Player data, switch team)**
-"Below, player data counted straight from the event log."
+**0:30 (scroll to Line-ups, click Finn Diallo)**
+"Below, the line-ups. Click a player for his numbers and a heatmap, all counted straight from the event log."
 
 **0:40 (Replay tab, drag to 86')**
 "The replay shows one event at a time, exactly what the caption says. At 86 minutes, Finn Diallo scores, with the shot direction."
